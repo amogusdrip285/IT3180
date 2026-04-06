@@ -1,0 +1,283 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+}
+
+enum Role {
+  ADMIN
+  ACCOUNTANT
+  TEAM_LEADER
+}
+
+enum HouseholdStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ResidentType {
+  PERMANENT
+  TEMPORARY
+}
+
+enum ResidencyEventType {
+  TEMP_RESIDENCE
+  TEMP_ABSENCE
+  MOVE_IN
+  MOVE_OUT
+}
+
+enum FeeCategory {
+  MANDATORY
+  VOLUNTARY
+}
+
+enum CalcMethod {
+  PER_M2
+  FIXED
+}
+
+enum PeriodStatus {
+  OPEN
+  CLOSED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK
+}
+
+enum OwnershipStatus {
+  OWNER
+  TENANT
+}
+
+enum CommunicationChannel {
+  SMS
+  EMAIL
+  ZALO
+  NOTICE
+}
+
+enum CommunicationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  RESET_PASSWORD
+  LOCK
+  UNLOCK
+  COLLECT_PAYMENT
+}
+
+model User {
+  id        Int        @id @default(autoincrement())
+  username  String     @unique
+  email     String     @unique
+  phone     String
+  fullName  String
+  role      Role
+  passwordHash String
+  failedLoginCount Int @default(0)
+  lockedUntil DateTime?
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  sessions  Session[]
+  audits    AuditLog[]
+  userRoles UserRole[]
+}
+
+model AppRole {
+  id          Int              @id @default(autoincrement())
+  code        String           @unique
+  name        String
+  description String           @default("")
+  userRoles   UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          Int              @id @default(autoincrement())
+  code        String           @unique
+  name        String
+  module      String
+  screen      String           @default("")
+  description String           @default("")
+  roles       RolePermission[]
+}
+
+model UserRole {
+  userId     Int
+  roleId     Int
+  assignedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       AppRole  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+  grantedAt    DateTime   @default(now())
+  role         AppRole    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model Household {
+  id          Int             @id @default(autoincrement())
+  apartmentNo String          @unique
+  floorNo     Int
+  ownerName   String
+  ownerPhone  String
+  emergencyContactName String?
+  emergencyContactPhone String?
+  parkingSlots Int @default(0)
+  moveInDate DateTime?
+  ownershipStatus OwnershipStatus @default(OWNER)
+  contractEndDate DateTime?
+  areaM2      Float
+  status      HouseholdStatus @default(ACTIVE)
+  residents   Resident[]
+  obligations Obligation[]
+  communications CommunicationLog[]
+  createdAt   DateTime @default(now())
+}
+
+model Resident {
+  id           Int          @id @default(autoincrement())
+  householdId  Int
+  fullName     String
+  dob          DateTime
+  gender       String
+  idNo         String       @unique
+  residentType ResidentType
+  household    Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  events       ResidencyEvent[]
+  createdAt    DateTime     @default(now())
+}
+
+model ResidencyEvent {
+  id        Int               @id @default(autoincrement())
+  residentId Int
+  eventType ResidencyEventType
+  fromDate  DateTime
+  toDate    DateTime?
+  note      String
+  createdBy String
+  resident  Resident          @relation(fields: [residentId], references: [id], onDelete: Cascade)
+}
+
+model FeeType {
+  id         Int         @id @default(autoincrement())
+  code       String      @unique
+  name       String
+  category   FeeCategory
+  calcMethod CalcMethod
+  rate       Float
+  graceDays  Int         @default(0)
+  lateFeeRule String     @default("")
+  effectiveFrom DateTime?
+  effectiveTo DateTime?
+  policyNote String      @default("")
+  active     Boolean     @default(true)
+  periods    FeePeriod[]
+  payments   Payment[]
+}
+
+model FeePeriod {
+  id        Int          @id @default(autoincrement())
+  feeTypeId Int
+  month     Int
+  year      Int
+  status    PeriodStatus @default(OPEN)
+  startDate DateTime?
+  endDate   DateTime?
+  feeType   FeeType      @relation(fields: [feeTypeId], references: [id], onDelete: Cascade)
+  obligations Obligation[]
+}
+
+model Obligation {
+  id          Int       @id @default(autoincrement())
+  periodId    Int
+  householdId Int
+  amountDue   Float
+  amountPaid  Float     @default(0)
+  period      FeePeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  payments    Payment[]
+
+  @@unique([periodId, householdId])
+}
+
+model Payment {
+  id           Int           @id @default(autoincrement())
+  obligationId Int
+  feeTypeId    Int
+  paidAmount   Float
+  method       PaymentMethod
+  paidAt       DateTime      @default(now())
+  collectorName String
+  payerName    String        @default("")
+  payerPhone   String        @default("")
+  bankTxRef    String        @default("")
+  attachmentUrl String       @default("")
+  reversalNote String        @default("")
+  receiptNo    String        @unique
+  note         String
+  obligation   Obligation    @relation(fields: [obligationId], references: [id], onDelete: Cascade)
+  feeType      FeeType       @relation(fields: [feeTypeId], references: [id], onDelete: Cascade)
+}
+
+model CommunicationLog {
+  id          Int                  @id @default(autoincrement())
+  householdId Int
+  sentAt      DateTime             @default(now())
+  channel     CommunicationChannel
+  status      CommunicationStatus
+  note        String               @default("")
+  household   Household            @relation(fields: [householdId], references: [id], onDelete: Cascade)
+}
+
+model Session {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  token     String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id        Int         @id @default(autoincrement())
+  actorUserId Int
+  action    AuditAction
+  entity    String
+  entityId  String
+  detail    String
+  createdAt DateTime    @default(now())
+  actor     User        @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
+}
