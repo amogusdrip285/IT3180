@@ -8,6 +8,8 @@ export type User = {
   email: string;
   phone: string;
   fullName: string;
+  avatarUrl?: string;
+  address?: string;
   role: Role;
   roleCodes?: string[];
   permissionCodes?: string[];

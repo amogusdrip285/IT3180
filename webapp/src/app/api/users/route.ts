@@ -24,6 +24,8 @@ export async function GET(req: NextRequest) {
       email: true,
       phone: true,
       fullName: true,
+      avatarUrl: true,
+      address: true,
       role: true,
       userRoles: {
         include: {
@@ -52,6 +54,8 @@ export async function POST(req: NextRequest) {
     fullName: string;
     role: "ADMIN" | "ACCOUNTANT" | "TEAM_LEADER";
     password: string;
+    avatarUrl?: string;
+    address?: string;
   };
   if (!body.username || !body.email || !body.phone || !body.fullName || !body.role || !body.password) {
     return apiError("VALIDATION_ERROR", "Missing required fields", 400);
@@ -75,6 +79,8 @@ export async function POST(req: NextRequest) {
       email: body.email,
       phone: body.phone,
       fullName: body.fullName,
+      avatarUrl: body.avatarUrl ?? "",
+      address: body.address ?? "",
       role: body.role,
       passwordHash: hashPassword(body.password),
       status: "ACTIVE",
@@ -85,6 +91,8 @@ export async function POST(req: NextRequest) {
       email: true,
       phone: true,
       fullName: true,
+      avatarUrl: true,
+      address: true,
       role: true,
       userRoles: {
         include: {

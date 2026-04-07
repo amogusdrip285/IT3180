@@ -51,7 +51,13 @@ Mặc định đang dùng SQLite local:
 
 ```env
 DATABASE_URL="file:./dev.db"
+ALLOW_BOOTSTRAP_SIGNUP="true"
 ```
+
+`ALLOW_BOOTSTRAP_SIGNUP`:
+
+- Đặt `true` khi cần mở màn hình đăng ký admin lần đầu.
+- Khuyến nghị đặt lại `false` sau khi đã tạo tài khoản quản trị đầu tiên.
 
 Tệp hiện có: `webapp/.env`
 

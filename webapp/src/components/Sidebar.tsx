@@ -1,6 +1,6 @@
 "use client";
 
-type Tab = "dashboard" | "fees" | "periods" | "obligations" | "households" | "residents" | "events" | "users" | "reports" | "handbook";
+type Tab = "dashboard" | "fees" | "periods" | "obligations" | "households" | "residents" | "events" | "users" | "reports" | "account" | "handbook";
 
 export function Sidebar({
   tab,
@@ -15,7 +15,7 @@ export function Sidebar({
   title: string;
   visibleTabs?: Tab[];
 }) {
-  const tabs: Tab[] = visibleTabs && visibleTabs.length > 0 ? visibleTabs : ["dashboard", "fees", "periods", "obligations", "households", "residents", "events", "users", "reports", "handbook"];
+  const tabs: Tab[] = visibleTabs && visibleTabs.length > 0 ? visibleTabs : ["dashboard", "account", "fees", "periods", "obligations", "households", "residents", "events", "users", "reports", "handbook"];
 
   return (
     <aside className="card h-fit">

@@ -96,6 +96,8 @@ model User {
   email     String     @unique
   phone     String
   fullName  String
+  avatarUrl String     @default("")
+  address   String     @default("")
   role      Role
   passwordHash String
   failedLoginCount Int @default(0)

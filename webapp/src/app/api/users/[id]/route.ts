@@ -18,6 +18,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const body = (await req.json()) as {
     fullName?: string;
     phone?: string;
+    avatarUrl?: string;
+    address?: string;
     role?: "ADMIN" | "ACCOUNTANT" | "TEAM_LEADER";
     status?: "ACTIVE" | "BLOCKED";
   };
@@ -33,6 +35,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     data: {
       fullName: body.fullName,
       phone: body.phone,
+      avatarUrl: body.avatarUrl,
+      address: body.address,
       role: body.role,
       status: body.status,
     },
@@ -42,6 +46,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       email: true,
       phone: true,
       fullName: true,
+      avatarUrl: true,
+      address: true,
       role: true,
       userRoles: {
         include: {

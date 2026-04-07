@@ -25,6 +25,10 @@ export async function POST(req: NextRequest) {
   if (!Number.isFinite(body.feeTypeId) || !Number.isFinite(body.month) || !Number.isFinite(body.year)) {
     return apiError("VALIDATION_ERROR", "Invalid period payload", 400);
   }
+  const existed = await db.feePeriod.findFirst({ where: { feeTypeId: body.feeTypeId, month: body.month, year: body.year } });
+  if (existed) {
+    return apiError("DUPLICATE_DATA", "Fee period already exists", 409, { field: "monthYear" });
+  }
   const row = await db.feePeriod.create({
     data: { feeTypeId: body.feeTypeId, month: body.month, year: body.year, status: "OPEN" },
   });

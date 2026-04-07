@@ -36,6 +36,10 @@ export async function POST(req: NextRequest) {
   if (!body.code || !body.name || !Number.isFinite(body.rate) || body.rate <= 0) {
     return apiError("VALIDATION_ERROR", "Invalid fee type payload", 400);
   }
+  const existingByCode = await db.feeType.findUnique({ where: { code: body.code } });
+  if (existingByCode) {
+    return apiError("DUPLICATE_DATA", "Fee code already exists", 409, { field: "code" });
+  }
   const graceDays = body.graceDays == null ? 0 : Number(body.graceDays);
   if (!Number.isInteger(graceDays) || graceDays < 0) {
     return apiError("VALIDATION_ERROR", "Invalid grace days", 400, { field: "graceDays" });

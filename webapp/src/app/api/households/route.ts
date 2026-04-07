@@ -40,6 +40,10 @@ export async function POST(req: NextRequest) {
   if (!body.apartmentNo || !floorNo || !body.ownerName || !body.ownerPhone || !area || area <= 0) {
     return apiError("VALIDATION_ERROR", "Invalid household payload", 400);
   }
+  const existingApartment = await db.household.findUnique({ where: { apartmentNo: body.apartmentNo } });
+  if (existingApartment) {
+    return apiError("DUPLICATE_DATA", "Apartment number already exists", 409, { field: "apartmentNo" });
+  }
   if (parkingSlots == null || parkingSlots < 0) {
     return apiError("VALIDATION_ERROR", "Invalid parking slots", 400, { field: "parkingSlots" });
   }

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart } from "@/components/BarChart";
+import { AccountPanel } from "@/components/AccountPanel";
+import { AuthCard } from "@/components/AuthCard";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { Sidebar } from "@/components/Sidebar";
 import { apiGet, apiPost } from "@/lib/api";
@@ -9,7 +11,7 @@ import { canPermission } from "@/lib/permission";
 import { t } from "@/lib/i18n";
 import type { AppRole, CommunicationLog, FeePeriod, FeeType, Household, Lang, Obligation, Payment, PermissionItem, ResidencyEvent, Resident, User } from "@/lib/types";
 
-type Tab = "dashboard" | "fees" | "periods" | "obligations" | "households" | "residents" | "events" | "users" | "reports" | "handbook";
+type Tab = "dashboard" | "fees" | "periods" | "obligations" | "households" | "residents" | "events" | "users" | "reports" | "account" | "handbook";
 const API_BASE = "/api";
 
 function formatVnd(value: number): string {
@@ -25,6 +27,12 @@ export default function Home() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [user, setUser] = useState<User | null>(null);
   const [loginError, setLoginError] = useState("");
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [signupUsername, setSignupUsername] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPhone, setSignupPhone] = useState("");
+  const [signupFullName, setSignupFullName] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState("");
   const [globalSearch, setGlobalSearch] = useState("");
@@ -100,6 +108,7 @@ export default function Home() {
   const [newPeriodFeeTypeId, setNewPeriodFeeTypeId] = useState<number>(1);
   const [newPeriodMonth, setNewPeriodMonth] = useState("5");
   const [newPeriodYear, setNewPeriodYear] = useState("2026");
+  const [newPeriodStatus, setNewPeriodStatus] = useState<"OPEN" | "CLOSED">("OPEN");
 
   const [eventResidentId, setEventResidentId] = useState<number>(1);
   const [eventType, setEventType] = useState<"TEMP_RESIDENCE" | "TEMP_ABSENCE" | "MOVE_IN" | "MOVE_OUT">("TEMP_RESIDENCE");
@@ -114,6 +123,13 @@ export default function Home() {
   const [newUserRole, setNewUserRole] = useState<"ADMIN" | "ACCOUNTANT" | "TEAM_LEADER">("ACCOUNTANT");
   const [newUserPassword, setNewUserPassword] = useState("Bm@2026!");
   const [resetPasswordValue, setResetPasswordValue] = useState("12345678");
+  const [editingHouseholdId, setEditingHouseholdId] = useState<number | null>(null);
+  const [editingResidentId, setEditingResidentId] = useState<number | null>(null);
+  const [editingFeeTypeId, setEditingFeeTypeId] = useState<number | null>(null);
+  const [editingPeriodId, setEditingPeriodId] = useState<number | null>(null);
+  const [editingPaymentId, setEditingPaymentId] = useState<number | null>(null);
+  const [selectedResidentIds, setSelectedResidentIds] = useState<number[]>([]);
+  const [selectedFeeTypeIds, setSelectedFeeTypeIds] = useState<number[]>([]);
   const [newRoleCode, setNewRoleCode] = useState("TEAM_SUPPORT");
   const [newRoleName, setNewRoleName] = useState("Team support");
   const [newPermCode, setNewPermCode] = useState("REPORT_EXPORT");
@@ -133,6 +149,16 @@ export default function Home() {
   const [profilePhone, setProfilePhone] = useState("");
   const [oldPassword, setOldPassword] = useState("");
   const [newPasswordSelf, setNewPasswordSelf] = useState("");
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
+
+  const [filterResidentGender, setFilterResidentGender] = useState<"all" | "MALE" | "FEMALE" | "OTHER">("all");
+  const [filterResidentType, setFilterResidentType] = useState<"all" | "PERMANENT" | "TEMPORARY">("all");
+  const [filterResidentFloor, setFilterResidentFloor] = useState<number | "all">("all");
+  const [filterPaymentCollector, setFilterPaymentCollector] = useState("");
+  const [filterPaymentMethod, setFilterPaymentMethod] = useState<"all" | "CASH" | "BANK">("all");
+  const [filterPaymentFromDate, setFilterPaymentFromDate] = useState("");
+  const [filterPaymentToDate, setFilterPaymentToDate] = useState("");
 
   const [filterMonth, setFilterMonth] = useState<number | "all">("all");
   const [filterYear, setFilterYear] = useState<number | "all">("all");
@@ -158,12 +184,33 @@ export default function Home() {
     events: t(lang, "residencyEvents"),
     users: t(lang, "users"),
     reports: t(lang, "reports"),
+    account: l(lang, "Tài khoản", "Account"),
     handbook: l(lang, "Hướng dẫn", "Handbook"),
   };
 
+  function notify(type: "success" | "error", message: string) {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3000);
+  }
+
+  const isAnyBusy = Object.values(busy).some(Boolean);
+
+  async function runAction(key: string, action: () => Promise<void>, successMsg: string, fallbackErr: string) {
+    setBusy((p) => ({ ...p, [key]: true }));
+    try {
+      await action();
+      notify("success", successMsg);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : fallbackErr;
+      notify("error", msg);
+    } finally {
+      setBusy((p) => ({ ...p, [key]: false }));
+    }
+  }
+
   const visibleTabs = useMemo(() => {
     if (!user) return ["handbook"] as Tab[];
-    const tabs: Tab[] = ["dashboard"];
+    const tabs: Tab[] = ["dashboard", "account"];
     if (canPermission(user, "FEE", "READ")) tabs.push("fees", "periods", "obligations");
     if (canPermission(user, "RESIDENT", "READ")) tabs.push("households", "residents", "events");
     if (canPermission(user, "SYSTEM", "ADMIN")) tabs.push("users");
@@ -242,7 +289,18 @@ export default function Home() {
 
   const searchToken = globalSearch.trim().toLowerCase();
   const filteredHouseholds = useMemo(() => households.filter((h) => `${h.apartmentNo} ${h.ownerName} ${h.ownerPhone}`.toLowerCase().includes(searchToken)), [households, searchToken]);
-  const filteredResidents = useMemo(() => residents.filter((r) => `${r.fullName} ${r.idNo}`.toLowerCase().includes(searchToken)), [residents, searchToken]);
+  const filteredResidents = useMemo(() => {
+    return residents.filter((r) => {
+      if (!`${r.fullName} ${r.idNo}`.toLowerCase().includes(searchToken)) return false;
+      if (filterResidentGender !== "all" && r.gender !== filterResidentGender) return false;
+      if (filterResidentType !== "all" && r.residentType !== filterResidentType) return false;
+      if (filterResidentFloor !== "all") {
+        const household = households.find((h) => h.id === r.householdId);
+        if (!household || household.floorNo !== filterResidentFloor) return false;
+      }
+      return true;
+    });
+  }, [residents, searchToken, filterResidentGender, filterResidentType, filterResidentFloor, households]);
   const pagedHouseholds = useMemo(() => filteredHouseholds.slice((pageHouseholds - 1) * pageSize, pageHouseholds * pageSize), [filteredHouseholds, pageHouseholds]);
   const pagedResidents = useMemo(() => filteredResidents.slice((pageResidents - 1) * pageSize, pageResidents * pageSize), [filteredResidents, pageResidents]);
   const paymentView = useMemo(() => {
@@ -259,10 +317,21 @@ export default function Home() {
         const key = `${period.year}-${String(period.month).padStart(2, "0")}`;
         if (key !== selectedMonthDrilldown) return false;
       }
+      if (filterPaymentMethod !== "all" && p.method !== filterPaymentMethod) return false;
+      if (filterPaymentCollector && !p.collectorName.toLowerCase().includes(filterPaymentCollector.toLowerCase())) return false;
+      if (filterPaymentFromDate) {
+        const from = new Date(filterPaymentFromDate);
+        if (new Date(p.paidAt) < from) return false;
+      }
+      if (filterPaymentToDate) {
+        const to = new Date(filterPaymentToDate);
+        to.setHours(23, 59, 59, 999);
+        if (new Date(p.paidAt) > to) return false;
+      }
       if (!searchToken) return true;
       return `${p.receiptNo} ${p.collectorName} ${p.payerName ?? ""} ${p.bankTxRef ?? ""}`.toLowerCase().includes(searchToken);
     });
-  }, [payments, obligations, periods, feeTypes, filterMonth, filterYear, filterType, selectedMonthDrilldown, searchToken]);
+  }, [payments, obligations, periods, feeTypes, filterMonth, filterYear, filterType, selectedMonthDrilldown, filterPaymentMethod, filterPaymentCollector, filterPaymentFromDate, filterPaymentToDate, searchToken]);
   const pagedPayments = useMemo(() => paymentView.slice((pagePayments - 1) * pageSize, pagePayments * pageSize), [paymentView, pagePayments]);
 
   const selectedObligation = obligations.find((o) => o.id === selectedObligationId) ?? obligations[0];
@@ -308,7 +377,37 @@ export default function Home() {
         await refreshAllFromApi();
         await refreshAuditLogs();
       })
-      .catch(() => setLoginError(t(lang, "loginFailed")));
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : t(lang, "loginFailed");
+        setLoginError(msg);
+      });
+  }
+
+  function signup() {
+    if (!signupUsername || !signupEmail || !signupPhone || !signupFullName || !signupPassword) {
+      setLoginError(l(lang, "Vui lòng nhập đủ thông tin đăng ký", "Please complete all signup fields"));
+      return;
+    }
+    void apiPost<{ ok: boolean; userId: number }>("/api/auth/signup", {
+      username: signupUsername,
+      email: signupEmail,
+      phone: signupPhone,
+      fullName: signupFullName,
+      password: signupPassword,
+    })
+      .then(() => {
+        setAuthMode("login");
+        setSignupUsername("");
+        setSignupEmail("");
+        setSignupPhone("");
+        setSignupFullName("");
+        setSignupPassword("");
+        setLoginError(l(lang, "Đăng ký admin thành công. Hãy đăng nhập.", "Admin signup successful. Please log in."));
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : l(lang, "Đăng ký thất bại", "Signup failed");
+        setLoginError(msg);
+      });
   }
 
   function logout() {
@@ -328,22 +427,38 @@ export default function Home() {
     });
   }
 
-  function updateProfile() {
-    void fetch(`${API_BASE}/profile`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fullName: profileFullName, email: profileEmail, phone: profilePhone }),
-    }).then(async () => {
-      await refreshAllFromApi();
-    });
-  }
-
   function changePasswordSelf() {
     if (!oldPassword || !newPasswordSelf) return;
     void apiPost(`${API_BASE}/profile/change-password`, { oldPassword, newPassword: newPasswordSelf }).then(() => {
       setOldPassword("");
       setNewPasswordSelf("");
     });
+  }
+
+  function uploadAvatar(file: File) {
+    const fd = new FormData();
+    fd.append("file", file);
+    void fetch(`${API_BASE}/profile/avatar`, {
+      method: "POST",
+      body: fd,
+    })
+      .then(async (r) => {
+        const data = (await r.json()) as { avatarUrl?: string; message?: string; code?: string };
+        if (!r.ok) {
+          throw new Error(data.message || data.code || l(lang, "Tải ảnh thất bại", "Avatar upload failed"));
+        }
+        return data;
+      })
+      .then((res) => {
+        if (res.avatarUrl) {
+          setUser((prev) => (prev ? { ...prev, avatarUrl: res.avatarUrl } : prev));
+          setErrorText(l(lang, "Tải ảnh đại diện thành công", "Avatar uploaded successfully"));
+        }
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : l(lang, "Tải ảnh thất bại", "Avatar upload failed");
+        setErrorText(msg);
+      });
   }
 
   function createUser() {
@@ -428,6 +543,47 @@ export default function Home() {
     });
   }
 
+  function saveHouseholdEdit() {
+    if (!editingHouseholdId) return;
+    const floor = Number(newFloorNo);
+    const area = Number(newAreaM2);
+    const parkingSlots = Number(newParkingSlots);
+    void fetch(`${API_BASE}/households/${editingHouseholdId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        apartmentNo: newApartmentNo.trim(),
+        floorNo: floor,
+        ownerName: newOwnerName.trim(),
+        ownerPhone: newOwnerPhone.trim(),
+        emergencyContactName: newEmergencyName.trim(),
+        emergencyContactPhone: newEmergencyPhone.trim(),
+        parkingSlots,
+        moveInDate: newMoveInDate || null,
+        ownershipStatus: newOwnershipStatus,
+        contractEndDate: newContractEndDate || null,
+        areaM2: area,
+      }),
+    }).then(async () => {
+      setEditingHouseholdId(null);
+      await refreshAllFromApi();
+    });
+  }
+
+  function deleteHousehold(id: number) {
+    if (!window.confirm(l(lang, "Bạn có chắc muốn xóa hộ khẩu này?", "Are you sure to delete this household?"))) return;
+    void runAction(
+      `delete-household-${id}`,
+      async () => {
+        const res = await fetch(`${API_BASE}/households/${id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error((await res.json()).message || "Delete failed");
+        await refreshAllFromApi();
+      },
+      l(lang, "Đã xóa hộ khẩu", "Household deleted"),
+      l(lang, "Xóa hộ khẩu thất bại", "Failed to delete household"),
+    );
+  }
+
   function addFeeType() {
     const rate = Number(newFeeRate);
     const graceDays = Number(newFeeGraceDays);
@@ -449,6 +605,67 @@ export default function Home() {
     });
   }
 
+  function saveFeeTypeEdit() {
+    if (!editingFeeTypeId) return;
+    const rate = Number(newFeeRate);
+    const graceDays = Number(newFeeGraceDays);
+    void fetch(`${API_BASE}/fee-types/${editingFeeTypeId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: newFeeCode.trim().toUpperCase(),
+        name: newFeeName.trim(),
+        category: newFeeCategory,
+        calcMethod: newFeeMethod,
+        rate,
+        graceDays,
+        lateFeeRule: newFeeLateRule,
+        effectiveFrom: newFeeEffectiveFrom || null,
+        effectiveTo: newFeeEffectiveTo || null,
+        policyNote: newFeePolicyNote,
+      }),
+    }).then(async () => {
+      setEditingFeeTypeId(null);
+      await refreshAllFromApi();
+    });
+  }
+
+  function deleteFeeType(id: number) {
+    if (!window.confirm(l(lang, "Bạn có chắc muốn xóa khoản phí này?", "Are you sure to delete this fee type?"))) return;
+    void runAction(
+      `delete-fee-${id}`,
+      async () => {
+        const res = await fetch(`${API_BASE}/fee-types/${id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error((await res.json()).message || "Delete failed");
+        await refreshAllFromApi();
+      },
+      l(lang, "Đã xóa khoản phí", "Fee type deleted"),
+      l(lang, "Xóa khoản phí thất bại", "Failed to delete fee type"),
+    );
+  }
+
+  function toggleFeeTypeSelection(id: number) {
+    setSelectedFeeTypeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  async function bulkDeleteFeeTypes() {
+    if (selectedFeeTypeIds.length === 0) return;
+    if (!window.confirm(l(lang, `Xóa ${selectedFeeTypeIds.length} khoản phí đã chọn?`, `Delete ${selectedFeeTypeIds.length} selected fee types?`))) return;
+
+    const failed: number[] = [];
+    for (const id of selectedFeeTypeIds) {
+      const res = await fetch(`${API_BASE}/fee-types/${id}`, { method: "DELETE" });
+      if (!res.ok) failed.push(id);
+    }
+    setSelectedFeeTypeIds([]);
+    await refreshAllFromApi();
+    if (failed.length > 0) {
+      notify("error", l(lang, `Không thể xóa ${failed.length} khoản phí do đã phát sinh kỳ thu/giao dịch`, `Failed to delete ${failed.length} fee types due to related periods/payments`));
+    } else {
+      notify("success", l(lang, "Đã xóa hàng loạt khoản phí", "Bulk fee delete completed"));
+    }
+  }
+
   function addResident() {
     if (!newResidentName.trim()) return;
     void apiPost(`${API_BASE}/residents`, {
@@ -462,6 +679,61 @@ export default function Home() {
       await refreshAllFromApi();
       await refreshAuditLogs();
     });
+  }
+
+  function saveResidentEdit() {
+    if (!editingResidentId) return;
+    void fetch(`${API_BASE}/residents/${editingResidentId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        householdId: newResidentHouseholdId,
+        fullName: newResidentName.trim(),
+        dob: newResidentDob,
+        gender: newResidentGender,
+        idNo: newResidentIdNo,
+        residentType: newResidentType,
+      }),
+    }).then(async () => {
+      setEditingResidentId(null);
+      await refreshAllFromApi();
+    });
+  }
+
+  function deleteResident(id: number) {
+    if (!window.confirm(l(lang, "Bạn có chắc muốn xóa nhân khẩu này?", "Are you sure to delete this resident?"))) return;
+    void runAction(
+      `delete-resident-${id}`,
+      async () => {
+        const res = await fetch(`${API_BASE}/residents/${id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error((await res.json()).message || "Delete failed");
+        await refreshAllFromApi();
+      },
+      l(lang, "Đã xóa nhân khẩu", "Resident deleted"),
+      l(lang, "Xóa nhân khẩu thất bại", "Failed to delete resident"),
+    );
+  }
+
+  function toggleResidentSelection(id: number) {
+    setSelectedResidentIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  async function bulkDeleteResidents() {
+    if (selectedResidentIds.length === 0) return;
+    if (!window.confirm(l(lang, `Xóa ${selectedResidentIds.length} nhân khẩu đã chọn?`, `Delete ${selectedResidentIds.length} selected residents?`))) return;
+
+    const failed: number[] = [];
+    for (const id of selectedResidentIds) {
+      const res = await fetch(`${API_BASE}/residents/${id}`, { method: "DELETE" });
+      if (!res.ok) failed.push(id);
+    }
+    setSelectedResidentIds([]);
+    await refreshAllFromApi();
+    if (failed.length > 0) {
+      notify("error", l(lang, `Không thể xóa ${failed.length} nhân khẩu do ràng buộc dữ liệu`, `Failed to delete ${failed.length} residents due to dependencies`));
+    } else {
+      notify("success", l(lang, "Đã xóa hàng loạt nhân khẩu", "Bulk resident delete completed"));
+    }
   }
 
   function addCommunicationLog(householdId: number) {
@@ -486,6 +758,41 @@ export default function Home() {
     });
   }
 
+  function savePeriodEdit() {
+    if (!editingPeriodId) return;
+    const month = Number(newPeriodMonth);
+    const year = Number(newPeriodYear);
+    if (!Number.isInteger(month) || month < 1 || month > 12) return;
+    if (!Number.isInteger(year) || year < 2000) return;
+    void fetch(`${API_BASE}/periods/${editingPeriodId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        feeTypeId: newPeriodFeeTypeId,
+        month,
+        year,
+        status: newPeriodStatus,
+      }),
+    }).then(async () => {
+      setEditingPeriodId(null);
+      await refreshAllFromApi();
+    });
+  }
+
+  function deletePeriod(id: number) {
+    if (!window.confirm(l(lang, "Bạn có chắc muốn xóa kỳ thu này?", "Are you sure to delete this period?"))) return;
+    void runAction(
+      `delete-period-${id}`,
+      async () => {
+        const res = await fetch(`${API_BASE}/periods/${id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error((await res.json()).message || "Delete failed");
+        await refreshAllFromApi();
+      },
+      l(lang, "Đã xóa kỳ thu", "Period deleted"),
+      l(lang, "Xóa kỳ thu thất bại", "Failed to delete period"),
+    );
+  }
+
   function collectPayment() {
     if (!selectedObligation) return;
     const amount = Number(paymentAmount);
@@ -505,6 +812,41 @@ export default function Home() {
       await refreshAllFromApi();
       await refreshAuditLogs();
     });
+  }
+
+  function savePaymentEdit() {
+    if (!editingPaymentId) return;
+    void fetch(`${API_BASE}/payments/${editingPaymentId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        method: paymentMethod,
+        collectorName,
+        payerName,
+        payerPhone,
+        bankTxRef,
+        attachmentUrl,
+        reversalNote,
+        note: paymentNote,
+      }),
+    }).then(async () => {
+      setEditingPaymentId(null);
+      await refreshAllFromApi();
+    });
+  }
+
+  function deletePayment(id: number) {
+    if (!window.confirm(l(lang, "Bạn có chắc muốn xóa giao dịch này?", "Are you sure to delete this payment?"))) return;
+    void runAction(
+      `delete-payment-${id}`,
+      async () => {
+        const res = await fetch(`${API_BASE}/payments/${id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error((await res.json()).message || "Delete failed");
+        await refreshAllFromApi();
+      },
+      l(lang, "Đã xóa giao dịch", "Payment deleted"),
+      l(lang, "Xóa giao dịch thất bại", "Failed to delete payment"),
+    );
   }
 
   function saveResidencyEvent() {
@@ -563,25 +905,45 @@ export default function Home() {
     window.open(`${API_BASE}/reports/residency?format=pdf`, "_blank");
   }
 
+  function downloadDebtSummaryCsv(householdId?: number) {
+    const params = new URLSearchParams();
+    if (householdId) params.set("householdId", String(householdId));
+    window.open(`${API_BASE}/reports/debt-summary?${params.toString()}`, "_blank");
+  }
+
+  function downloadDebtSummaryPdf(householdId?: number) {
+    const params = new URLSearchParams();
+    params.set("format", "pdf");
+    if (householdId) params.set("householdId", String(householdId));
+    window.open(`${API_BASE}/reports/debt-summary?${params.toString()}`, "_blank");
+  }
+
+  function printPaymentReceipt(paymentId: number) {
+    window.open(`${API_BASE}/payments/${paymentId}/receipt`, "_blank");
+  }
+
   if (!user) {
     return (
-      <main className="page-center">
-        <section className="card w-full max-w-md">
-          <div className="flex justify-between items-center gap-2">
-            <div>
-              <p className="eyebrow">BlueMoon</p>
-              <h1 className="title">{t(lang, "login")}</h1>
-            </div>
-            <LanguageSwitch lang={lang} onChange={setLang} label={t(lang, "language")} />
-          </div>
-          <form action={login} className="space-y-3 mt-5">
-            <input name="username" className="input" placeholder={t(lang, "loginAsEmailOrUsername")} defaultValue="admin" />
-            <input name="password" className="input" type="password" placeholder={t(lang, "password")} defaultValue="admin" />
-            {loginError && <p className="error-text">{loginError}</p>}
-            <button type="submit" className="btn-primary w-full">{t(lang, "signIn")}</button>
-          </form>
-        </section>
-      </main>
+      <AuthCard
+        lang={lang}
+        onChangeLang={setLang}
+        loginError={loginError}
+        authMode={authMode}
+        setAuthMode={setAuthMode}
+        signupUsername={signupUsername}
+        setSignupUsername={setSignupUsername}
+        signupEmail={signupEmail}
+        setSignupEmail={setSignupEmail}
+        signupPhone={signupPhone}
+        setSignupPhone={setSignupPhone}
+        signupFullName={signupFullName}
+        setSignupFullName={setSignupFullName}
+        signupPassword={signupPassword}
+        setSignupPassword={setSignupPassword}
+        onSignup={signup}
+        onLogin={login}
+        l={l}
+      />
     );
   }
 
@@ -603,7 +965,14 @@ export default function Home() {
         <Sidebar tab={tab} onTab={setTab} labels={labels} title={t(lang, "nav")} visibleTabs={visibleTabs} />
 
         <div className="space-y-4">
+          {toast && (
+            <section className={`card ${toast.type === "success" ? "border-[#b7e4c7]" : "border-[#f4b6b6]"}`}>
+              <p className={toast.type === "success" ? "text-[#1f7a3f]" : "text-[#b42318]"}>{toast.message}</p>
+            </section>
+          )}
+
           <section className="card">
+            {isAnyBusy && <p className="muted mb-2">{l(lang, "Đang xử lý thao tác...", "Processing action...")}</p>}
             <div className="grid gap-2 md:grid-cols-3 items-end">
               <div>
                 <label className="label">{l(lang, "Tìm kiếm toàn cục", "Global search")}</label>
@@ -626,18 +995,6 @@ export default function Home() {
             </div>
             {loading && <p className="muted mt-2">{t(lang, "loading")}</p>}
             {errorText && <p className="error-text mt-2">{errorText}</p>}
-
-            <div className="grid gap-2 mt-3 md:grid-cols-4">
-              <input className="input" value={profileFullName} onChange={(e) => setProfileFullName(e.target.value)} placeholder={t(lang, "fullName")} />
-              <input className="input" value={profileEmail} onChange={(e) => setProfileEmail(e.target.value)} placeholder={t(lang, "email")} />
-              <input className="input" value={profilePhone} onChange={(e) => setProfilePhone(e.target.value)} placeholder={t(lang, "phone")} />
-              <button className="btn-secondary" onClick={updateProfile}>{l(lang, "Cập nhật hồ sơ", "Update profile")}</button>
-            </div>
-            <div className="grid gap-2 mt-2 md:grid-cols-3">
-              <input className="input" type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} placeholder={l(lang, "Mật khẩu hiện tại", "Current password")} />
-              <input className="input" type="password" value={newPasswordSelf} onChange={(e) => setNewPasswordSelf(e.target.value)} placeholder={l(lang, "Mật khẩu mới", "New password")} />
-              <button className="btn-secondary" onClick={changePasswordSelf}>{l(lang, "Đổi mật khẩu", "Change password")}</button>
-            </div>
           </section>
 
           {tab === "dashboard" && (
@@ -666,7 +1023,7 @@ export default function Home() {
                   <p className="muted">{l(lang, "Tổng đóng góp", "Total contribution")}: {formatVnd(analytics?.voluntaryStats.totalAmount ?? 0)}</p>
                 </article>
                 <article className="card">
-                  <h3 className="subtitle">{l(lang, "Nợ theo tuổi nợ", "Aging debt")}</h3>
+                  <h3 className="subtitle">{l(lang, "Nợ theo số ngày trễ hạn đóng tiền", "Overdue debt by late-payment days")}</h3>
                   {(analytics?.aging ?? []).map((a) => <p key={a.label} className="muted mt-1">{a.label}: {a.count} | {formatVnd(a.amount)}</p>)}
                 </article>
               </section>
@@ -691,7 +1048,11 @@ export default function Home() {
                 </select>
                 <input className="input" type="date" value={newContractEndDate} onChange={(e) => setNewContractEndDate(e.target.value)} />
                 <input className="input" value={newAreaM2} onChange={(e) => setNewAreaM2(e.target.value)} placeholder={`${t(lang, "area")} (m2)`} />
-                <button className="btn-primary" onClick={addHousehold}>{t(lang, "addHousehold")}</button>
+                {editingHouseholdId ? (
+                  <button className="btn-primary" onClick={saveHouseholdEdit}>{l(lang, "Lưu chỉnh sửa", "Save edit")}</button>
+                ) : (
+                  <button className="btn-primary" onClick={addHousehold}>{t(lang, "addHousehold")}</button>
+                )}
               </div>
 
               <div className="table-wrap mt-3">
@@ -706,7 +1067,27 @@ export default function Home() {
                         <td>{h.emergencyContactName || "-"} {h.emergencyContactPhone ? `(${h.emergencyContactPhone})` : ""}</td>
                         <td>{h.parkingSlots ?? 0}</td>
                         <td>{h.moveInDate ? new Date(h.moveInDate).toLocaleDateString("vi-VN") : "-"}</td>
-                        <td><button className="btn-secondary" onClick={() => addCommunicationLog(h.id)}>{l(lang, "Gửi", "Send")}</button></td>
+                        <td>
+                          <div className="flex gap-2">
+                            <button className="btn-secondary" onClick={() => addCommunicationLog(h.id)}>{l(lang, "Gửi", "Send")}</button>
+                            <button className="btn-secondary" onClick={() => downloadDebtSummaryPdf(h.id)}>{l(lang, "In công nợ", "Print debt")}</button>
+                            <button className="btn-secondary" onClick={() => {
+                              setEditingHouseholdId(h.id);
+                              setNewApartmentNo(h.apartmentNo);
+                              setNewFloorNo(String(h.floorNo));
+                              setNewOwnerName(h.ownerName);
+                              setNewOwnerPhone(h.ownerPhone);
+                              setNewEmergencyName(h.emergencyContactName ?? "");
+                              setNewEmergencyPhone(h.emergencyContactPhone ?? "");
+                              setNewParkingSlots(String(h.parkingSlots ?? 0));
+                              setNewMoveInDate(h.moveInDate ? h.moveInDate.slice(0, 10) : "");
+                              setNewOwnershipStatus(h.ownershipStatus ?? "OWNER");
+                              setNewContractEndDate(h.contractEndDate ? h.contractEndDate.slice(0, 10) : "");
+                              setNewAreaM2(String(h.areaM2));
+                            }}>{l(lang, "Sửa", "Edit")}</button>
+                            <button className="btn-danger" onClick={() => deleteHousehold(h.id)}>{l(lang, "Xóa", "Delete")}</button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -753,27 +1134,58 @@ export default function Home() {
               <div className="grid gap-2 mt-2 md:grid-cols-3">
                 <input className="input" type="date" value={newFeeEffectiveFrom} onChange={(e) => setNewFeeEffectiveFrom(e.target.value)} />
                 <input className="input" type="date" value={newFeeEffectiveTo} onChange={(e) => setNewFeeEffectiveTo(e.target.value)} />
-                <button className="btn-primary" onClick={addFeeType}>{t(lang, "add")}</button>
+                {editingFeeTypeId ? (
+                  <button className="btn-primary" onClick={saveFeeTypeEdit}>{l(lang, "Lưu chỉnh sửa", "Save edit")}</button>
+                ) : (
+                  <button className="btn-primary" onClick={addFeeType}>{t(lang, "add")}</button>
+                )}
               </div>
               <div className="table-wrap mt-3">
                 <table>
-                  <thead><tr><th>{t(lang, "code")}</th><th>{t(lang, "name")}</th><th>{t(lang, "rate")}</th><th>{l(lang, "Ân hạn", "Grace")}</th><th>{l(lang, "Phạt trễ", "Late rule")}</th></tr></thead>
-                  <tbody>{feeTypes.map((f) => <tr key={f.id}><td>{f.code}</td><td>{f.name}</td><td>{formatVnd(f.rate)}</td><td>{f.graceDays ?? 0}</td><td>{f.lateFeeRule || "-"}</td></tr>)}</tbody>
+                  <thead><tr><th><input type="checkbox" checked={feeTypes.length > 0 && selectedFeeTypeIds.length === feeTypes.length} onChange={(e) => setSelectedFeeTypeIds(e.target.checked ? feeTypes.map((x) => x.id) : [])} /></th><th>{t(lang, "code")}</th><th>{t(lang, "name")}</th><th>{t(lang, "rate")}</th><th>{l(lang, "Ân hạn", "Grace")}</th><th>{l(lang, "Phạt trễ", "Late rule")}</th><th>{l(lang, "Thao tác", "Actions")}</th></tr></thead>
+                  <tbody>{feeTypes.map((f) => <tr key={f.id}><td><input type="checkbox" checked={selectedFeeTypeIds.includes(f.id)} onChange={() => toggleFeeTypeSelection(f.id)} /></td><td>{f.code}</td><td>{f.name}</td><td>{formatVnd(f.rate)}</td><td>{f.graceDays ?? 0}</td><td>{f.lateFeeRule || "-"}</td><td><div className="flex gap-2"><button className="btn-secondary" onClick={() => {
+                    setEditingFeeTypeId(f.id);
+                    setNewFeeCode(f.code);
+                    setNewFeeName(f.name);
+                    setNewFeeCategory(f.category);
+                    setNewFeeMethod(f.calcMethod);
+                    setNewFeeRate(String(f.rate));
+                    setNewFeeGraceDays(String(f.graceDays ?? 0));
+                    setNewFeeLateRule(f.lateFeeRule ?? "");
+                    setNewFeeEffectiveFrom(f.effectiveFrom ? f.effectiveFrom.slice(0, 10) : "");
+                    setNewFeeEffectiveTo(f.effectiveTo ? f.effectiveTo.slice(0, 10) : "");
+                    setNewFeePolicyNote(f.policyNote ?? "");
+                  }}>{l(lang, "Sửa", "Edit")}</button><button className="btn-danger" onClick={() => deleteFeeType(f.id)}>{l(lang, "Xóa", "Delete")}</button></div></td></tr>)}</tbody>
                 </table>
               </div>
+              <button className="btn-danger mt-2" onClick={() => void bulkDeleteFeeTypes()}>{l(lang, "Xóa đã chọn", "Delete selected")}</button>
             </section>
           )}
 
           {tab === "periods" && (
             <section className="card">
               <h2 className="subtitle">{t(lang, "periods")}</h2>
-              <div className="grid gap-2 mt-3 md:grid-cols-4">
+              <div className="grid gap-2 mt-3 md:grid-cols-5">
                 <select className="input" value={newPeriodFeeTypeId} onChange={(e) => setNewPeriodFeeTypeId(Number(e.target.value))}>{feeTypes.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
                 <input className="input" value={newPeriodMonth} onChange={(e) => setNewPeriodMonth(e.target.value)} />
                 <input className="input" value={newPeriodYear} onChange={(e) => setNewPeriodYear(e.target.value)} />
-                <button className="btn-primary" onClick={addPeriod}>{t(lang, "add")}</button>
+                <select className="input" value={newPeriodStatus} onChange={(e) => setNewPeriodStatus(e.target.value as "OPEN" | "CLOSED")}>
+                  <option value="OPEN">OPEN</option>
+                  <option value="CLOSED">CLOSED</option>
+                </select>
+                {editingPeriodId ? (
+                  <button className="btn-primary" onClick={savePeriodEdit}>{l(lang, "Lưu chỉnh sửa", "Save edit")}</button>
+                ) : (
+                  <button className="btn-primary" onClick={addPeriod}>{t(lang, "add")}</button>
+                )}
               </div>
-              <div className="table-wrap mt-3"><table><thead><tr><th>ID</th><th>{t(lang, "name")}</th><th>{t(lang, "month")}</th><th>{t(lang, "year")}</th><th>{t(lang, "status")}</th></tr></thead><tbody>{periods.map((p) => <tr key={p.id}><td>{p.id}</td><td>{feeTypes.find((f) => f.id === p.feeTypeId)?.name}</td><td>{p.month}</td><td>{p.year}</td><td>{p.status}</td></tr>)}</tbody></table></div>
+              <div className="table-wrap mt-3"><table><thead><tr><th>ID</th><th>{t(lang, "name")}</th><th>{t(lang, "month")}</th><th>{t(lang, "year")}</th><th>{t(lang, "status")}</th><th>{l(lang, "Thao tác", "Actions")}</th></tr></thead><tbody>{periods.map((p) => <tr key={p.id}><td>{p.id}</td><td>{feeTypes.find((f) => f.id === p.feeTypeId)?.name}</td><td>{p.month}</td><td>{p.year}</td><td>{p.status}</td><td><div className="flex gap-2"><button className="btn-secondary" onClick={() => {
+                setEditingPeriodId(p.id);
+                setNewPeriodFeeTypeId(p.feeTypeId);
+                setNewPeriodMonth(String(p.month));
+                setNewPeriodYear(String(p.year));
+                setNewPeriodStatus(p.status);
+              }}>{l(lang, "Sửa", "Edit")}</button><button className="btn-danger" onClick={() => deletePeriod(p.id)}>{l(lang, "Xóa", "Delete")}</button></div></td></tr>)}</tbody></table></div>
             </section>
           )}
 
@@ -800,8 +1212,22 @@ export default function Home() {
                 <input className="input" value={attachmentUrl} onChange={(e) => setAttachmentUrl(e.target.value)} placeholder={l(lang, "URL chứng từ", "Attachment URL")} />
                 <input className="input" value={reversalNote} onChange={(e) => setReversalNote(e.target.value)} placeholder={l(lang, "Ghi chú hoàn tác", "Reversal note")} />
               </div>
+              <div className="grid gap-2 mt-2 md:grid-cols-4">
+                <input className="input" value={filterPaymentCollector} onChange={(e) => setFilterPaymentCollector(e.target.value)} placeholder={l(lang, "Lọc theo người thu", "Filter by collector")} />
+                <select className="input" value={filterPaymentMethod} onChange={(e) => setFilterPaymentMethod(e.target.value as "all" | "CASH" | "BANK")}>
+                  <option value="all">{l(lang, "Mọi phương thức", "All methods")}</option>
+                  <option value="CASH">{t(lang, "paymentMethodCash")}</option>
+                  <option value="BANK">{t(lang, "paymentMethodBank")}</option>
+                </select>
+                <input className="input" type="date" value={filterPaymentFromDate} onChange={(e) => setFilterPaymentFromDate(e.target.value)} />
+                <input className="input" type="date" value={filterPaymentToDate} onChange={(e) => setFilterPaymentToDate(e.target.value)} />
+              </div>
               <input className="input mt-2" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} placeholder={t(lang, "noteField")} />
-              <button className="btn-primary mt-3" onClick={collectPayment}>{t(lang, "collectPayment")}</button>
+              {editingPaymentId ? (
+                <button className="btn-primary mt-3" onClick={savePaymentEdit}>{l(lang, "Lưu chỉnh sửa", "Save edit")}</button>
+              ) : (
+                <button className="btn-primary mt-3" onClick={collectPayment}>{t(lang, "collectPayment")}</button>
+              )}
 
               <h3 className="subtitle mt-4">{l(lang, "Dòng thời gian giao dịch", "Payment timeline")}</h3>
               <div className="timeline mt-2">
@@ -810,6 +1236,21 @@ export default function Home() {
                     <div className="timeline-top"><strong>{p.receiptNo}</strong><strong>{formatVnd(p.paidAmount)}</strong></div>
                     <p className="muted mt-1">{p.collectorName} • {new Date(p.paidAt).toLocaleString("vi-VN")}</p>
                     <p className="muted">{p.payerName || "-"} {p.bankTxRef ? `• ${p.bankTxRef}` : ""}</p>
+                    <div className="flex gap-2 mt-2">
+                      <button className="btn-secondary" onClick={() => {
+                        setEditingPaymentId(p.id);
+                        setPaymentMethod(p.method);
+                        setCollectorName(p.collectorName);
+                        setPayerName(p.payerName ?? "");
+                        setPayerPhone(p.payerPhone ?? "");
+                        setBankTxRef(p.bankTxRef ?? "");
+                        setAttachmentUrl(p.attachmentUrl ?? "");
+                        setReversalNote(p.reversalNote ?? "");
+                        setPaymentNote(p.note);
+                      }}>{l(lang, "Sửa", "Edit")}</button>
+                      <button className="btn-secondary" onClick={() => printPaymentReceipt(p.id)}>{l(lang, "In biên lai", "Print receipt")}</button>
+                      <button className="btn-danger" onClick={() => deletePayment(p.id)}>{l(lang, "Xóa", "Delete")}</button>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -826,12 +1267,47 @@ export default function Home() {
                 <select className="input" value={newResidentGender} onChange={(e) => setNewResidentGender(e.target.value as "MALE" | "FEMALE" | "OTHER")}><option value="MALE">{t(lang, "male")}</option><option value="FEMALE">{t(lang, "female")}</option><option value="OTHER">{t(lang, "other")}</option></select>
                 <input className="input" value={newResidentIdNo} onChange={(e) => setNewResidentIdNo(e.target.value)} placeholder={t(lang, "idNo")} />
                 <select className="input" value={newResidentType} onChange={(e) => setNewResidentType(e.target.value as "PERMANENT" | "TEMPORARY")}><option value="PERMANENT">{t(lang, "residentPermanent")}</option><option value="TEMPORARY">{t(lang, "residentTemporary")}</option></select>
-                <button className="btn-primary" onClick={addResident}>{t(lang, "addResident")}</button>
+                {editingResidentId ? (
+                  <button className="btn-primary" onClick={saveResidentEdit}>{l(lang, "Lưu chỉnh sửa", "Save edit")}</button>
+                ) : (
+                  <button className="btn-primary" onClick={addResident}>{t(lang, "addResident")}</button>
+                )}
               </div>
-              <div className="table-wrap mt-3"><table><thead><tr><th>{t(lang, "fullName")}</th><th>{t(lang, "apartment")}</th><th>{t(lang, "dob")}</th><th>{t(lang, "idNo")}</th></tr></thead><tbody>{pagedResidents.map((r) => <tr key={r.id}><td>{r.fullName}</td><td>{households.find((x) => x.id === r.householdId)?.apartmentNo}</td><td>{new Date(r.dob).toLocaleDateString("vi-VN")}</td><td>{r.idNo}</td></tr>)}</tbody></table></div>
+              <div className="table-wrap mt-3"><table><thead><tr><th><input type="checkbox" checked={pagedResidents.length > 0 && pagedResidents.every((x) => selectedResidentIds.includes(x.id))} onChange={(e) => setSelectedResidentIds(e.target.checked ? Array.from(new Set([...selectedResidentIds, ...pagedResidents.map((x) => x.id)])) : selectedResidentIds.filter((id) => !pagedResidents.some((x) => x.id === id)))} /></th><th>{t(lang, "fullName")}</th><th>{t(lang, "apartment")}</th><th>{t(lang, "dob")}</th><th>{t(lang, "idNo")}</th><th>{l(lang, "Thao tác", "Actions")}</th></tr></thead><tbody>{pagedResidents.map((r) => <tr key={r.id}><td><input type="checkbox" checked={selectedResidentIds.includes(r.id)} onChange={() => toggleResidentSelection(r.id)} /></td><td>{r.fullName}</td><td>{households.find((x) => x.id === r.householdId)?.apartmentNo}</td><td>{new Date(r.dob).toLocaleDateString("vi-VN")}</td><td>{r.idNo}</td><td><div className="flex gap-2"><button className="btn-secondary" onClick={() => {
+                setEditingResidentId(r.id);
+                setNewResidentName(r.fullName);
+                setNewResidentHouseholdId(r.householdId);
+                setNewResidentDob(r.dob.slice(0, 10));
+                setNewResidentGender(r.gender);
+                setNewResidentIdNo(r.idNo);
+                setNewResidentType(r.residentType);
+              }}>{l(lang, "Sửa", "Edit")}</button><button className="btn-danger" onClick={() => deleteResident(r.id)}>{l(lang, "Xóa", "Delete")}</button></div></td></tr>)}</tbody></table></div>
               <div className="flex gap-2 mt-2">
                 <button className="btn-secondary" disabled={pageResidents <= 1} onClick={() => setPageResidents((p) => Math.max(1, p - 1))}>{l(lang, "Trước", "Prev")}</button>
                 <button className="btn-secondary" disabled={pageResidents * pageSize >= filteredResidents.length} onClick={() => setPageResidents((p) => p + 1)}>{l(lang, "Sau", "Next")}</button>
+              </div>
+              <button className="btn-danger mt-2" onClick={() => void bulkDeleteResidents()}>{l(lang, "Xóa đã chọn", "Delete selected")}</button>
+              <div className="grid gap-2 mt-3 md:grid-cols-4">
+                <select className="input" value={filterResidentGender} onChange={(e) => setFilterResidentGender(e.target.value as "all" | "MALE" | "FEMALE" | "OTHER")}>
+                  <option value="all">{l(lang, "Mọi giới tính", "All genders")}</option>
+                  <option value="MALE">{t(lang, "male")}</option>
+                  <option value="FEMALE">{t(lang, "female")}</option>
+                  <option value="OTHER">{t(lang, "other")}</option>
+                </select>
+                <select className="input" value={filterResidentType} onChange={(e) => setFilterResidentType(e.target.value as "all" | "PERMANENT" | "TEMPORARY")}>
+                  <option value="all">{l(lang, "Mọi loại cư trú", "All resident types")}</option>
+                  <option value="PERMANENT">{t(lang, "residentPermanent")}</option>
+                  <option value="TEMPORARY">{t(lang, "residentTemporary")}</option>
+                </select>
+                <select className="input" value={String(filterResidentFloor)} onChange={(e) => setFilterResidentFloor(e.target.value === "all" ? "all" : Number(e.target.value))}>
+                  <option value="all">{l(lang, "Mọi tầng", "All floors")}</option>
+                  {Array.from(new Set(households.map((h) => h.floorNo))).sort((a, b) => a - b).map((floor) => <option key={floor} value={floor}>{l(lang, "Tầng", "Floor")} {floor}</option>)}
+                </select>
+                <button className="btn-secondary" onClick={() => {
+                  setFilterResidentGender("all");
+                  setFilterResidentType("all");
+                  setFilterResidentFloor("all");
+                }}>{l(lang, "Xóa lọc cư dân", "Clear resident filters")}</button>
               </div>
             </section>
           )}
@@ -952,10 +1428,12 @@ export default function Home() {
                 <button className="btn-secondary" onClick={downloadPaymentsPdf}>{l(lang, "Xuất thu phí PDF", "Export payments PDF")}</button>
                 <button className="btn-secondary" onClick={downloadResidencyCsv}>{l(lang, "Xuất cư trú CSV", "Export residency CSV")}</button>
                 <button className="btn-secondary" onClick={downloadResidencyPdf}>{l(lang, "Xuất cư trú PDF", "Export residency PDF")}</button>
+                <button className="btn-secondary" onClick={() => downloadDebtSummaryCsv()}>{l(lang, "Xuất công nợ CSV", "Export debt CSV")}</button>
+                <button className="btn-secondary" onClick={() => downloadDebtSummaryPdf()}>{l(lang, "Xuất công nợ PDF", "Export debt PDF")}</button>
               </div>
               <div className="grid gap-4 md:grid-cols-2 mt-3">
-                <BarChart title={l(lang, "Tỉ lệ thu theo tháng (%)", "Collection rate by month (%)")} data={(analytics?.collectionByMonth ?? []).map((x) => ({ label: x.label, value: x.rate }))} color="linear-gradient(90deg,#2b8a3e,#46b95e)" maxBars={8} />
-                <BarChart title={l(lang, "Nợ theo tuổi nợ", "Aging debt")} data={(analytics?.aging ?? []).map((x) => ({ label: x.label, value: x.amount }))} color="linear-gradient(90deg,#d96b41,#ee9c5f)" formatter={formatVnd} maxBars={8} />
+                <BarChart title={l(lang, "Tỉ lệ thu theo từng tháng (%)", "Collection rate by month (%)")} data={(analytics?.collectionByMonth ?? []).map((x) => ({ label: x.label, value: x.rate }))} color="linear-gradient(90deg,#2b8a3e,#46b95e)" maxBars={8} />
+                <BarChart title={l(lang, "Nợ theo số ngày trễ hạn đóng tiền", "Overdue debt by late-payment days")} data={(analytics?.aging ?? []).map((x) => ({ label: x.label, value: x.amount }))} color="linear-gradient(90deg,#d96b41,#ee9c5f)" formatter={formatVnd} maxBars={8} />
               </div>
 
               <div className="card mt-3">
@@ -1023,6 +1501,42 @@ export default function Home() {
                 </article>
               </div>
             </section>
+          )}
+
+          {tab === "account" && (
+            <>
+              <AccountPanel
+                user={user}
+                lang={lang}
+                profileFullName={profileFullName}
+                setProfileFullName={setProfileFullName}
+                profileEmail={profileEmail}
+                setProfileEmail={setProfileEmail}
+                profilePhone={profilePhone}
+                setProfilePhone={setProfilePhone}
+                oldPassword={oldPassword}
+                setOldPassword={setOldPassword}
+                newPasswordSelf={newPasswordSelf}
+                setNewPasswordSelf={setNewPasswordSelf}
+                setUser={setUser}
+                changePasswordSelf={changePasswordSelf}
+                refreshAllFromApi={refreshAllFromApi}
+                l={l}
+              />
+              <section className="card">
+                <h3 className="subtitle">{l(lang, "Tải ảnh đại diện", "Upload avatar")}</h3>
+                <input
+                  className="input mt-2"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) uploadAvatar(file);
+                  }}
+                />
+                <p className="muted mt-2">{l(lang, "Hỗ trợ PNG/JPEG/WEBP, tối đa 2MB", "Supports PNG/JPEG/WEBP, max 2MB")}</p>
+              </section>
+            </>
           )}
 
           {tab === "handbook" && (

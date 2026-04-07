@@ -7,6 +7,8 @@ export type AuthUser = {
   id: number;
   username: string;
   fullName: string;
+  avatarUrl: string;
+  address: string;
   role: "ADMIN" | "ACCOUNTANT" | "TEAM_LEADER";
   roleCodes: string[];
   permissionCodes: string[];
@@ -59,6 +61,8 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     id: session.user.id,
     username: session.user.username,
     fullName: session.user.fullName,
+    avatarUrl: session.user.avatarUrl,
+    address: session.user.address,
     role: session.user.role,
     roleCodes,
     permissionCodes,
