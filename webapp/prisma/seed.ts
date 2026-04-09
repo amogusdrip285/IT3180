@@ -114,6 +114,10 @@ async function main() {
     prisma.household.create({ data: { apartmentNo: "A-0906", floorNo: 9, ownerName: "Phạm Hồng Hải", ownerPhone: "0903.444.906", emergencyContactName: "Phạm Huyền", emergencyContactPhone: "0909.400.906", parkingSlots: 0, moveInDate: new Date("2024-03-10"), ownershipStatus: "TENANT", contractEndDate: new Date("2026-12-31"), areaM2: 60, status: "ACTIVE" } }),
     prisma.household.create({ data: { apartmentNo: "B-1102", floorNo: 11, ownerName: "Đào Thị Lan", ownerPhone: "0903.555.102", emergencyContactName: "Đào Quang", emergencyContactPhone: "0909.500.102", parkingSlots: 1, moveInDate: new Date("2020-09-09"), ownershipStatus: "OWNER", contractEndDate: null, areaM2: 74, status: "ACTIVE" } }),
     prisma.household.create({ data: { apartmentNo: "C-1508", floorNo: 15, ownerName: "Vũ Quốc Bình", ownerPhone: "0903.666.508", emergencyContactName: "Vũ Ngọc Anh", emergencyContactPhone: "0909.600.508", parkingSlots: 2, moveInDate: new Date("2022-11-18"), ownershipStatus: "OWNER", contractEndDate: null, areaM2: 88, status: "ACTIVE" } }),
+    prisma.household.create({ data: { apartmentNo: "A-0702", floorNo: 7, ownerName: "Bùi Thanh Sơn", ownerPhone: "0903.777.702", emergencyContactName: "Bùi Thu Hà", emergencyContactPhone: "0909.700.702", parkingSlots: 1, moveInDate: new Date("2021-08-14"), ownershipStatus: "OWNER", contractEndDate: null, areaM2: 72, status: "ACTIVE" } }),
+    prisma.household.create({ data: { apartmentNo: "B-2004", floorNo: 20, ownerName: "Phan Đức Long", ownerPhone: "0903.888.204", emergencyContactName: "Phan Minh Châu", emergencyContactPhone: "0909.800.204", parkingSlots: 2, moveInDate: new Date("2023-04-22"), ownershipStatus: "TENANT", contractEndDate: new Date("2027-04-22"), areaM2: 91, status: "ACTIVE" } }),
+    prisma.household.create({ data: { apartmentNo: "C-1009", floorNo: 10, ownerName: "Ngô Hải Yến", ownerPhone: "0903.999.109", emergencyContactName: "Ngô Quang Vinh", emergencyContactPhone: "0909.900.109", parkingSlots: 1, moveInDate: new Date("2020-12-06"), ownershipStatus: "OWNER", contractEndDate: null, areaM2: 79, status: "ACTIVE" } }),
+    prisma.household.create({ data: { apartmentNo: "D-0301", floorNo: 3, ownerName: "Trịnh Tuấn Khang", ownerPhone: "0903.101.301", emergencyContactName: "Trịnh Thu An", emergencyContactPhone: "0909.101.301", parkingSlots: 1, moveInDate: new Date("2024-01-05"), ownershipStatus: "TENANT", contractEndDate: new Date("2026-10-01"), areaM2: 64, status: "ACTIVE" } }),
   ]);
 
   await prisma.communicationLog.createMany({
@@ -133,6 +137,10 @@ async function main() {
     prisma.resident.create({ data: { householdId: households[4].id, fullName: "Đào Thị Lan", dob: new Date("1991-09-29"), gender: "FEMALE", idNo: "012345678906", residentType: "PERMANENT" } }),
     prisma.resident.create({ data: { householdId: households[5].id, fullName: "Vũ Quốc Bình", dob: new Date("1988-07-05"), gender: "MALE", idNo: "012345678907", residentType: "PERMANENT" } }),
     prisma.resident.create({ data: { householdId: households[5].id, fullName: "Vũ Ngọc Anh", dob: new Date("2001-11-18"), gender: "FEMALE", idNo: "012345678908", residentType: "TEMPORARY" } }),
+    prisma.resident.create({ data: { householdId: households[6].id, fullName: "Bùi Thanh Sơn", dob: new Date("1986-05-07"), gender: "MALE", idNo: "012345678909", residentType: "PERMANENT" } }),
+    prisma.resident.create({ data: { householdId: households[7].id, fullName: "Phan Đức Long", dob: new Date("1983-03-03"), gender: "MALE", idNo: "012345678910", residentType: "PERMANENT" } }),
+    prisma.resident.create({ data: { householdId: households[8].id, fullName: "Ngô Hải Yến", dob: new Date("1992-10-19"), gender: "FEMALE", idNo: "012345678911", residentType: "PERMANENT" } }),
+    prisma.resident.create({ data: { householdId: households[9].id, fullName: "Trịnh Tuấn Khang", dob: new Date("1995-01-25"), gender: "MALE", idNo: "012345678912", residentType: "TEMPORARY" } }),
   ]);
 
   await prisma.residencyEvent.createMany({
@@ -209,12 +217,23 @@ async function main() {
   }
 
   let receiptIdx = 1;
+  const overdueReference = new Date("2026-04-15").getTime();
+  const targetOverdueApartments = new Set(["C-1009", "D-0301"]);
   for (const p of periods) {
     const feeType = feeTypeById.get(p.feeTypeId)!;
+    const periodDueDate = new Date(p.year, p.month - 1, 1).getTime();
+    const isOverdueAtReference = periodDueDate < overdueReference;
     for (const h of households) {
       const due = feeType.calcMethod === "PER_M2" ? h.areaM2 * feeType.rate : feeType.rate;
-      const paidRatio = ((h.id + p.month + p.year) % 4) / 4;
-      const amountPaid = p.status === "OPEN" ? Math.round(due * Math.min(paidRatio, 0.35)) : Math.round(due * paidRatio);
+      const isTargetOverdueHousehold = targetOverdueApartments.has(h.apartmentNo);
+      const inRecentOverdueWindow = p.year === 2026 && (p.month === 3 || p.month === 4);
+      let paidRatio = 1;
+      if (isOverdueAtReference && isTargetOverdueHousehold && inRecentOverdueWindow) {
+        paidRatio = feeType.calcMethod === "PER_M2" ? 0.55 : 0.35;
+      } else if (!isOverdueAtReference) {
+        paidRatio = (h.id + p.month + p.year) % 3 === 0 ? 0.45 : 0.8;
+      }
+      const amountPaid = p.status === "OPEN" ? Math.round(due * Math.min(paidRatio, 0.5)) : Math.round(due * paidRatio);
       const obligation = await prisma.obligation.create({
         data: {
           periodId: p.id,

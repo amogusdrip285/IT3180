@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { apiError } from "@/lib/errors";
 import { makeSimplePdf } from "@/lib/pdf";
 
+export const runtime = "nodejs";
+
 export async function GET(_: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;

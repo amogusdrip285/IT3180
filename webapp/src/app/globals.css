@@ -13,6 +13,71 @@
   --accent-violet: #5b57d9;
 }
 
+body.theme-red {
+  --background: #fff4f2;
+  --foreground: #4a1a14;
+  --surface: #ffffff;
+  --border: #f2c6bf;
+  --brand: #d6432d;
+  --brand-dark: #b7311d;
+  --muted: #8d5047;
+  --accent-teal: #1b9f88;
+  --accent-orange: #ec8a2f;
+  --accent-violet: #9d4edd;
+}
+
+body.theme-yellow {
+  --background: #fffceb;
+  --foreground: #4a3a10;
+  --surface: #ffffff;
+  --border: #f0de9a;
+  --brand: #d7a80d;
+  --brand-dark: #b98f07;
+  --muted: #7a6731;
+  --accent-teal: #1ea39b;
+  --accent-orange: #e7862b;
+  --accent-violet: #7a6ad9;
+}
+
+body.theme-green {
+  --background: #effcf3;
+  --foreground: #143722;
+  --surface: #ffffff;
+  --border: #bfe3cd;
+  --brand: #1f9d57;
+  --brand-dark: #157f45;
+  --muted: #466658;
+  --accent-teal: #19a9a0;
+  --accent-orange: #e58c2b;
+  --accent-violet: #4f9e8a;
+}
+
+body.theme-pink {
+  --background: #fff4f8;
+  --foreground: #4a1730;
+  --surface: #ffffff;
+  --border: #f1c8d8;
+  --brand: #d9468f;
+  --brand-dark: #be2f78;
+  --muted: #8d4b68;
+  --accent-teal: #34b6a8;
+  --accent-orange: #f28f59;
+  --accent-violet: #a855f7;
+}
+
+body.theme-blue {
+  --background: #f3f7fc;
+  --foreground: #11203a;
+  --surface: #ffffff;
+  --border: #cfd9e8;
+  --brand: #0f5fdf;
+  --brand-dark: #0a47a8;
+  --muted: #5b6b88;
+  --accent-teal: #0aa8a5;
+  --accent-orange: #f39b30;
+  --accent-violet: #5b57d9;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -343,6 +408,143 @@ th {
   margin: 0;
 }
 
+.field-error {
+  margin: 0.2rem 0 0;
+  color: #b22424;
+  font-size: 0.75rem;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 20, 35, 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 50;
+  padding: 1rem;
+}
+
+.modal-card {
+  width: min(640px, 100%);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 0.95rem;
+  padding: 1rem;
+  box-shadow: 0 20px 45px -20px rgba(16, 33, 57, 0.55);
+}
+
+.hist-line-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hist-line {
+  fill: none;
+  stroke: #f59e0b;
+  stroke-width: 1;
+}
+
+.hist-line-dot {
+  fill: #f59e0b;
+}
+
+.donut-wrap {
+  display: grid;
+  gap: 1.2rem;
+  grid-template-columns: 260px 1fr;
+  align-items: center;
+}
+
+.donut-stage {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  display: grid;
+  place-items: center;
+}
+
+.donut {
+  width: 250px;
+  height: 250px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 22px 40px -24px rgba(23, 57, 109, 0.7), inset 0 2px 10px rgba(255, 255, 255, 0.5);
+}
+
+.donut-active {
+  transform: scale(1.015);
+  transition: transform 0.15s ease;
+}
+
+.donut-stage::before {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+
+.donut-hole {
+  width: 148px;
+  height: 148px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  border: 1px solid #dce8f9;
+  box-shadow: inset 0 6px 16px rgba(116, 150, 206, 0.16);
+}
+
+.legend-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.donut-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid #d5e2f6;
+  background: #f7fbff;
+  color: #36557f;
+  border-radius: 0.65rem;
+  padding: 0.35rem 0.6rem;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.donut-legend.active,
+.donut-legend:hover {
+  border-color: #9ec0f2;
+  background: #eef5ff;
+}
+
+.donut-tooltip {
+  position: absolute;
+  bottom: -0.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  background: #102847;
+  color: #fff;
+  border-radius: 0.55rem;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.74rem;
+  box-shadow: 0 12px 22px -14px rgba(0, 0, 0, 0.7);
+}
+
 .chart-row-head {
   display: flex;
   justify-content: space-between;
@@ -452,7 +654,6 @@ th {
   width: 80%;
   border-radius: 0.45rem 0.45rem 0.2rem 0.2rem;
   box-shadow: 0 8px 20px -14px rgba(21, 70, 136, 0.75);
-  cursor: pointer;
 }
 
 .hist-label {
@@ -540,6 +741,11 @@ tbody tr:hover {
 
   .quick-actions {
     display: grid;
+  }
+
+  .donut-wrap {
+    grid-template-columns: 1fr;
+    justify-items: center;
   }
 }
 

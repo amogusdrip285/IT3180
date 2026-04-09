@@ -39,7 +39,11 @@ export async function POST(req: Request) {
     await fs.mkdir(uploadDir, { recursive: true });
     await fs.writeFile(path.join(uploadDir, fileName), bytes);
 
-    const avatarUrl = `/uploads/avatars/${fileName}`;
+    const normalizedUploadDir = uploadDir.replace(/\\/g, "/");
+    const normalizedPublicDir = path.join(process.cwd(), "public").replace(/\\/g, "/");
+    const avatarUrl = normalizedUploadDir.startsWith(normalizedPublicDir)
+      ? `/${normalizedUploadDir.slice(normalizedPublicDir.length).replace(/^\/+/, "")}/${fileName}`
+      : `/uploads/avatars/${fileName}`;
     await db.user.update({ where: { id: auth.user!.id }, data: { avatarUrl } });
 
     return NextResponse.json({ ok: true, avatarUrl });

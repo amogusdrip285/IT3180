@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { requireAuth, requirePermission } from "@/lib/auth";
 import { makeSimplePdf } from "@/lib/pdf";
 
+export const runtime = "nodejs";
+
 function toCsvValue(value: unknown): string {
   const text = String(value ?? "").replace(/"/g, '""');
   return `"${text}"`;

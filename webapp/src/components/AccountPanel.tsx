@@ -62,7 +62,6 @@ export function AccountPanel({
             <input className="input" value={profileFullName} onChange={(e) => setProfileFullName(e.target.value)} placeholder={l(lang, "Họ và tên", "Full name")} />
             <input className="input" value={profileEmail} onChange={(e) => setProfileEmail(e.target.value)} placeholder={l(lang, "Email", "Email")} />
             <input className="input" value={profilePhone} onChange={(e) => setProfilePhone(e.target.value)} placeholder={l(lang, "So dien thoai", "Phone")} />
-            <input className="input" value={user.avatarUrl ?? ""} onChange={(e) => setUser((prev) => (prev ? { ...prev, avatarUrl: e.target.value } : prev))} placeholder={l(lang, "URL anh dai dien", "Avatar URL")} />
             <input className="input md:col-span-2" value={user.address ?? ""} onChange={(e) => setUser((prev) => (prev ? { ...prev, address: e.target.value } : prev))} placeholder={l(lang, "Địa chỉ", "Address")} />
           </div>
           <button
@@ -75,7 +74,6 @@ export function AccountPanel({
                   fullName: profileFullName,
                   email: profileEmail,
                   phone: profilePhone,
-                  avatarUrl: user.avatarUrl ?? "",
                   address: user.address ?? "",
                 }),
               }).then(async () => {

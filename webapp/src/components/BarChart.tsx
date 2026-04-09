@@ -9,8 +9,6 @@ export function BarChart({
   formatter,
   maxBars = 12,
   paginationLabels,
-  onBarClick,
-  selectedLabel,
 }: {
   title: string;
   data: Array<{ label: string; value: number }>;
@@ -22,8 +20,6 @@ export function BarChart({
     next: string;
     showing: string;
   };
-  onBarClick?: (label: string) => void;
-  selectedLabel?: string;
 }) {
   const [page, setPage] = useState(0);
   const totalPages = Math.max(1, Math.ceil(data.length / maxBars));
@@ -85,10 +81,8 @@ export function BarChart({
                     style={{
                       height: `${Math.max(4, (d.value / max) * 100)}%`,
                       background: color,
-                      outline: selectedLabel === d.label ? "2px solid #1f3a66" : "none",
                     }}
                     title={`${d.label}: ${d.value.toLocaleString("vi-VN")}`}
-                    onClick={() => onBarClick?.(d.label)}
                   />
                 </div>
                 <div className="hist-label">{d.label}</div>
