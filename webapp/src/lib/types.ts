@@ -83,6 +83,8 @@ export type FeePeriod = {
   month: number;
   year: number;
   status: "OPEN" | "CLOSED";
+  startDate?: string | null;
+  endDate?: string | null;
 };
 
 export type Obligation = {
@@ -109,6 +111,7 @@ export type Payment = {
   receiptNo: string;
   note: string;
 };
+
 
 export type CommunicationLog = {
   id: number;

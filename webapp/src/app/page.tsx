@@ -39,6 +39,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState("");
   const [globalSearch, setGlobalSearch] = useState("");
+  const [globalSearchDebounced, setGlobalSearchDebounced] = useState("");
 
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<AppRole[]>([]);
@@ -126,7 +127,6 @@ export default function Home() {
   const [newUserFullName, setNewUserFullName] = useState("");
   const [newUserRole, setNewUserRole] = useState<"ADMIN" | "ACCOUNTANT" | "TEAM_LEADER">("ACCOUNTANT");
   const [newUserPassword, setNewUserPassword] = useState("");
-  const [resetPasswordValue, setResetPasswordValue] = useState("");
   const [editingHouseholdId, setEditingHouseholdId] = useState<number | null>(null);
   const [editingResidentId, setEditingResidentId] = useState<number | null>(null);
   const [editingFeeTypeId, setEditingFeeTypeId] = useState<number | null>(null);
@@ -147,7 +147,10 @@ export default function Home() {
 
   const [pageHouseholds, setPageHouseholds] = useState(1);
   const [pageResidents, setPageResidents] = useState(1);
-  const [pagePayments, setPagePayments] = useState(1);
+  const [pagePaymentsTab, setPagePaymentsTab] = useState(1);
+  const [pageReportPayments, setPageReportPayments] = useState(1);
+  const [pageEvents, setPageEvents] = useState(1);
+  const [pageCommunications, setPageCommunications] = useState(1);
   const pageSize = 10;
   const [profileFullName, setProfileFullName] = useState("");
   const [profileEmail, setProfileEmail] = useState("");
@@ -163,30 +166,38 @@ export default function Home() {
   const [filterResidentType, setFilterResidentType] = useState<"all" | "PERMANENT" | "TEMPORARY">("all");
   const [filterResidentFloor, setFilterResidentFloor] = useState<number | "all">("all");
   const [filterHouseholdQuery, setFilterHouseholdQuery] = useState("");
+  const [filterHouseholdQueryDebounced, setFilterHouseholdQueryDebounced] = useState("");
   const [filterHouseholdOwnership, setFilterHouseholdOwnership] = useState<"all" | "OWNER" | "TENANT">("all");
   const [filterHouseholdFloor, setFilterHouseholdFloor] = useState<number | "all">("all");
   const [filterFeeQuery, setFilterFeeQuery] = useState("");
+  const [filterFeeQueryDebounced, setFilterFeeQueryDebounced] = useState("");
   const [filterFeeCategory, setFilterFeeCategory] = useState<"all" | "MANDATORY" | "VOLUNTARY">("all");
   const [filterFeeMethod, setFilterFeeMethod] = useState<"all" | "PER_M2" | "FIXED">("all");
   const [filterPeriodQuery, setFilterPeriodQuery] = useState("");
+  const [filterPeriodQueryDebounced, setFilterPeriodQueryDebounced] = useState("");
   const [filterPeriodStatus, setFilterPeriodStatus] = useState<"all" | "OPEN" | "CLOSED">("all");
   const [filterPeriodFeeTypeId, setFilterPeriodFeeTypeId] = useState<number | "all">("all");
   const [filterEventQuery, setFilterEventQuery] = useState("");
+  const [filterEventQueryDebounced, setFilterEventQueryDebounced] = useState("");
   const [filterEventType, setFilterEventType] = useState<"all" | "TEMP_RESIDENCE" | "TEMP_ABSENCE" | "MOVE_IN" | "MOVE_OUT">("all");
   const [filterEventResidentId, setFilterEventResidentId] = useState<number | "all">("all");
   const [filterUserQuery, setFilterUserQuery] = useState("");
+  const [filterUserQueryDebounced, setFilterUserQueryDebounced] = useState("");
   const [filterUserRole, setFilterUserRole] = useState<"all" | "ADMIN" | "ACCOUNTANT" | "TEAM_LEADER">("all");
   const [filterUserStatus, setFilterUserStatus] = useState<"all" | "ACTIVE" | "BLOCKED">("all");
+  const [inspectHouseholdSearch, setInspectHouseholdSearch] = useState("");
   const [filterPaymentCollector, setFilterPaymentCollector] = useState("");
   const [filterPaymentPayer, setFilterPaymentPayer] = useState("");
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<"all" | "CASH" | "BANK">("all");
+  const [filterPaymentFeeTypeId, setFilterPaymentFeeTypeId] = useState<number | "all">("all");
+  const [filterPaymentHouseholdId, setFilterPaymentHouseholdId] = useState<number | "all">("all");
   const [filterPaymentFromDate, setFilterPaymentFromDate] = useState("");
   const [filterPaymentToDate, setFilterPaymentToDate] = useState("");
 
   const [filterMonth, setFilterMonth] = useState<number | "all">("all");
   const [filterYear, setFilterYear] = useState<number | "all">("all");
   const [filterType] = useState<"all" | "MANDATORY" | "VOLUNTARY">("all");
-  const [showPaymentColumns, setShowPaymentColumns] = useState<Record<string, boolean>>({
+  const [showReportPaymentColumns, setShowReportPaymentColumns] = useState<Record<string, boolean>>({
     receipt: true,
     period: true,
     fee: true,
@@ -260,20 +271,34 @@ export default function Home() {
     return tabs;
   }, [user]);
 
+  async function apiGetAllPages<T>(url: string, pageSize = 500): Promise<T[]> {
+    const all: T[] = [];
+    let page = 1;
+    while (true) {
+      const sep = url.includes("?") ? "&" : "?";
+      const chunk = await apiGet<T[]>(`${url}${sep}page=${page}&pageSize=${pageSize}`);
+      all.push(...chunk);
+      if (chunk.length < pageSize) break;
+      page += 1;
+      if (page > 200) break;
+    }
+    return all;
+  }
+
   const refreshAllFromApi = useCallback(async () => {
     setLoading(true);
     setErrorText("");
     try {
       const [u, h, r, f, p, o, pay, ev, comm, an, roleRows, permRows] = await Promise.all([
-        apiGet<User[]>(`${API_BASE}/users?page=1&pageSize=500`).catch(() => []),
-        apiGet<Household[]>(`${API_BASE}/households?page=1&pageSize=500`),
-        apiGet<Resident[]>(`${API_BASE}/residents?page=1&pageSize=500`),
-        apiGet<FeeType[]>(`${API_BASE}/fee-types?page=1&pageSize=500`),
-        apiGet<FeePeriod[]>(`${API_BASE}/periods?page=1&pageSize=500`),
-        apiGet<Obligation[]>(`${API_BASE}/obligations?page=1&pageSize=500`),
-        apiGet<Payment[]>(`${API_BASE}/payments?page=1&pageSize=500`),
-        apiGet<ResidencyEvent[]>(`${API_BASE}/residency-events?page=1&pageSize=500`),
-        apiGet<Array<CommunicationLog & { household?: Household }>>(`${API_BASE}/communication-logs?page=1&pageSize=200`),
+        apiGetAllPages<User>(`${API_BASE}/users`).catch(() => []),
+        apiGetAllPages<Household>(`${API_BASE}/households`),
+        apiGetAllPages<Resident>(`${API_BASE}/residents`),
+        apiGetAllPages<FeeType>(`${API_BASE}/fee-types`),
+        apiGetAllPages<FeePeriod>(`${API_BASE}/periods`),
+        apiGetAllPages<Obligation>(`${API_BASE}/obligations`),
+        apiGetAllPages<Payment>(`${API_BASE}/payments`),
+        apiGetAllPages<ResidencyEvent>(`${API_BASE}/residency-events`),
+        apiGetAllPages<CommunicationLog & { household?: Household }>(`${API_BASE}/communication-logs`, 200),
         apiGet<{ aging: Array<{ label: string; count: number; amount: number }>; collectionByMonth: Array<{ label: string; due: number; paid: number; rate: number }>; byCollector: Array<{ collector: string; amount: number }>; byFloor: Array<{ floor: number; due: number; paid: number; rate: number }>; voluntaryStats: { participatingHouseholds: number; totalHouseholds: number; participationRate: number; totalAmount: number; averageContribution: number } }>(`${API_BASE}/reports/analytics`),
         apiGet<AppRole[]>(`${API_BASE}/roles`).catch(() => []),
         apiGet<PermissionItem[]>(`${API_BASE}/permissions`).catch(() => []),
@@ -335,12 +360,88 @@ export default function Home() {
     document.body.classList.add(`theme-${theme}`);
   }, [theme]);
 
-  const searchToken = globalSearch.trim().toLowerCase();
-  const householdFilterToken = filterHouseholdQuery.trim().toLowerCase();
-  const feeFilterToken = filterFeeQuery.trim().toLowerCase();
-  const periodFilterToken = filterPeriodQuery.trim().toLowerCase();
-  const eventFilterToken = filterEventQuery.trim().toLowerCase();
-  const userFilterToken = filterUserQuery.trim().toLowerCase();
+  useEffect(() => {
+    const t = setTimeout(() => setGlobalSearchDebounced(globalSearch), 180);
+    return () => clearTimeout(t);
+  }, [globalSearch]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setFilterHouseholdQueryDebounced(filterHouseholdQuery), 180);
+    return () => clearTimeout(t);
+  }, [filterHouseholdQuery]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setFilterFeeQueryDebounced(filterFeeQuery), 180);
+    return () => clearTimeout(t);
+  }, [filterFeeQuery]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setFilterPeriodQueryDebounced(filterPeriodQuery), 180);
+    return () => clearTimeout(t);
+  }, [filterPeriodQuery]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setFilterEventQueryDebounced(filterEventQuery), 180);
+    return () => clearTimeout(t);
+  }, [filterEventQuery]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setFilterUserQueryDebounced(filterUserQuery), 180);
+    return () => clearTimeout(t);
+  }, [filterUserQuery]);
+
+  const searchToken = globalSearchDebounced.trim().toLowerCase();
+  const householdFilterToken = filterHouseholdQueryDebounced.trim().toLowerCase();
+  const feeFilterToken = filterFeeQueryDebounced.trim().toLowerCase();
+  const periodFilterToken = filterPeriodQueryDebounced.trim().toLowerCase();
+  const eventFilterToken = filterEventQueryDebounced.trim().toLowerCase();
+  const userFilterToken = filterUserQueryDebounced.trim().toLowerCase();
+  const householdById = useMemo(() => new Map(households.map((h) => [h.id, h] as const)), [households]);
+  const residentById = useMemo(() => new Map(residents.map((r) => [r.id, r] as const)), [residents]);
+  const obligationById = useMemo(() => new Map(obligations.map((o) => [o.id, o] as const)), [obligations]);
+  const periodById = useMemo(() => new Map(periods.map((p) => [p.id, p] as const)), [periods]);
+  const feeTypeByIdMap = useMemo(() => new Map(feeTypes.map((f) => [f.id, f] as const)), [feeTypes]);
+  const residentCountByHouseholdId = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const r of residents) m.set(r.householdId, (m.get(r.householdId) ?? 0) + 1);
+    return m;
+  }, [residents]);
+  const householdOutstandingById = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const o of obligations) {
+      m.set(o.householdId, (m.get(o.householdId) ?? 0) + Math.max(0, o.amountDue - o.amountPaid));
+    }
+    return m;
+  }, [obligations]);
+  const paymentFacts = useMemo(() => {
+    return payments
+      .map((p) => {
+        const obligation = obligationById.get(p.obligationId);
+        if (!obligation) return null;
+        const period = periodById.get(obligation.periodId);
+        const feeType = feeTypeByIdMap.get(p.feeTypeId);
+        const household = householdById.get(obligation.householdId);
+        if (!period || !feeType || !household) return null;
+        return {
+          payment: p,
+          obligation,
+          period,
+          feeType,
+          household,
+          paidAtTs: new Date(p.paidAt).getTime(),
+          search: `${p.receiptNo} ${p.collectorName} ${p.payerName ?? ""} ${p.bankTxRef ?? ""}`.toLowerCase(),
+        };
+      })
+      .filter((x): x is {
+        payment: Payment;
+        obligation: Obligation;
+        period: FeePeriod;
+        feeType: FeeType;
+        household: Household;
+        paidAtTs: number;
+        search: string;
+      } => Boolean(x));
+  }, [payments, obligationById, periodById, feeTypeByIdMap, householdById]);
   const filteredHouseholds = useMemo(() => {
     return households.filter((h) => {
       const base = `${h.apartmentNo} ${h.ownerName} ${h.ownerPhone}`.toLowerCase();
@@ -351,18 +452,33 @@ export default function Home() {
       return true;
     });
   }, [households, searchToken, householdFilterToken, filterHouseholdOwnership, filterHouseholdFloor]);
+  const inspectHouseholdList = useMemo(() => {
+    const token = inspectHouseholdSearch.trim().toLowerCase();
+    const source = filteredHouseholds;
+    if (!token) return source;
+    return source.filter((h) => `${h.apartmentNo} ${h.ownerName} ${h.ownerPhone}`.toLowerCase().includes(token));
+  }, [filteredHouseholds, inspectHouseholdSearch]);
+  const inspectedHousehold = useMemo(() => {
+    if (!inspectHouseholdId) return null;
+    const hh = households.find((x) => x.id === inspectHouseholdId);
+    if (!hh) return null;
+    const hhResidents = residents.filter((r) => r.householdId === hh.id);
+    const hhObligations = obligations.filter((o) => o.householdId === hh.id);
+    const hhDebt = hhObligations.reduce((s, o) => s + Math.max(0, o.amountDue - o.amountPaid), 0);
+    return { hh, hhResidents, hhObligations, hhDebt };
+  }, [inspectHouseholdId, households, residents, obligations]);
   const filteredResidents = useMemo(() => {
     return residents.filter((r) => {
       if (!`${r.fullName} ${r.idNo}`.toLowerCase().includes(searchToken)) return false;
       if (filterResidentGender !== "all" && r.gender !== filterResidentGender) return false;
       if (filterResidentType !== "all" && r.residentType !== filterResidentType) return false;
       if (filterResidentFloor !== "all") {
-        const household = households.find((h) => h.id === r.householdId);
+        const household = householdById.get(r.householdId);
         if (!household || household.floorNo !== filterResidentFloor) return false;
       }
       return true;
     });
-  }, [residents, searchToken, filterResidentGender, filterResidentType, filterResidentFloor, households]);
+  }, [residents, searchToken, filterResidentGender, filterResidentType, filterResidentFloor, householdById]);
   const pagedHouseholds = useMemo(() => filteredHouseholds.slice((pageHouseholds - 1) * pageSize, pageHouseholds * pageSize), [filteredHouseholds, pageHouseholds]);
   const pagedResidents = useMemo(() => filteredResidents.slice((pageResidents - 1) * pageSize, pageResidents * pageSize), [filteredResidents, pageResidents]);
   const filteredFeeTypes = useMemo(
@@ -376,21 +492,21 @@ export default function Home() {
     [feeTypes, feeFilterToken, filterFeeCategory, filterFeeMethod],
   );
   const filteredPeriods = useMemo(() => periods.filter((p) => {
-    const ft = feeTypes.find((f) => f.id === p.feeTypeId);
+    const ft = feeTypeByIdMap.get(p.feeTypeId);
     const text = `${p.id} ${ft?.name ?? ""} ${p.month}/${p.year} ${p.status}`.toLowerCase();
     if (!text.includes(periodFilterToken)) return false;
     if (filterPeriodStatus !== "all" && p.status !== filterPeriodStatus) return false;
     if (filterPeriodFeeTypeId !== "all" && p.feeTypeId !== filterPeriodFeeTypeId) return false;
     return true;
-  }), [periods, feeTypes, periodFilterToken, filterPeriodStatus, filterPeriodFeeTypeId]);
+  }), [periods, feeTypeByIdMap, periodFilterToken, filterPeriodStatus, filterPeriodFeeTypeId]);
   const filteredEvents = useMemo(() => events.filter((ev) => {
-    const r = residents.find((x) => x.id === ev.residentId);
+    const r = residentById.get(ev.residentId);
     const text = `${r?.fullName ?? ""} ${ev.eventType} ${ev.note}`.toLowerCase();
     if (!text.includes(eventFilterToken)) return false;
     if (filterEventType !== "all" && ev.eventType !== filterEventType) return false;
     if (filterEventResidentId !== "all" && ev.residentId !== filterEventResidentId) return false;
     return true;
-  }), [events, residents, eventFilterToken, filterEventType, filterEventResidentId]);
+  }), [events, residentById, eventFilterToken, filterEventType, filterEventResidentId]);
   const filteredUsers = useMemo(
     () =>
       users.filter((u) => {
@@ -401,39 +517,72 @@ export default function Home() {
       }),
     [users, userFilterToken, filterUserRole, filterUserStatus],
   );
+  const shouldComputePaymentViews = tab === "obligations" || tab === "reports" || tab === "dashboard";
+
   const paymentView = useMemo(() => {
-    return payments.filter((p) => {
-      const obligation = obligations.find((o) => o.id === p.obligationId);
-      if (!obligation) return false;
-      const period = periods.find((x) => x.id === obligation.periodId);
-      const feeType = feeTypes.find((x) => x.id === p.feeTypeId);
-      if (!period || !feeType) return false;
-      if (filterMonth !== "all" && period.month !== filterMonth) return false;
-      if (filterYear !== "all" && period.year !== filterYear) return false;
-      if (filterType !== "all" && feeType.category !== filterType) return false;
-      if (filterPaymentMethod !== "all" && p.method !== filterPaymentMethod) return false;
-      if (filterPaymentCollector && p.collectorName !== filterPaymentCollector) return false;
-      if (filterPaymentPayer && (p.payerName ?? "") !== filterPaymentPayer) return false;
-      if (filterPaymentFromDate) {
-        const from = new Date(filterPaymentFromDate);
-        if (new Date(p.paidAt) < from) return false;
-      }
-      if (filterPaymentToDate) {
-        const to = new Date(filterPaymentToDate);
-        to.setHours(23, 59, 59, 999);
-        if (new Date(p.paidAt) > to) return false;
-      }
-      if (!searchToken) return true;
-      return `${p.receiptNo} ${p.collectorName} ${p.payerName ?? ""} ${p.bankTxRef ?? ""}`.toLowerCase().includes(searchToken);
-    });
-  }, [payments, obligations, periods, feeTypes, filterMonth, filterYear, filterType, filterPaymentMethod, filterPaymentCollector, filterPaymentPayer, filterPaymentFromDate, filterPaymentToDate, searchToken]);
-  const pagedPayments = useMemo(() => paymentView.slice((pagePayments - 1) * pageSize, pagePayments * pageSize), [paymentView, pagePayments]);
+    if (!shouldComputePaymentViews) return [] as Payment[];
+    const fromTs = filterPaymentFromDate ? new Date(filterPaymentFromDate).getTime() : null;
+    const toTs = filterPaymentToDate ? new Date(filterPaymentToDate).setHours(23, 59, 59, 999) : null;
+    return paymentFacts
+      .filter((x) => {
+        if (filterMonth !== "all" && x.period.month !== filterMonth) return false;
+        if (filterYear !== "all" && x.period.year !== filterYear) return false;
+        if (filterType !== "all" && x.feeType.category !== filterType) return false;
+        if (filterPaymentMethod !== "all" && x.payment.method !== filterPaymentMethod) return false;
+        if (filterPaymentFeeTypeId !== "all" && x.payment.feeTypeId !== filterPaymentFeeTypeId) return false;
+        if (filterPaymentHouseholdId !== "all" && x.obligation.householdId !== filterPaymentHouseholdId) return false;
+        if (filterPaymentCollector && x.payment.collectorName !== filterPaymentCollector) return false;
+        if (filterPaymentPayer && (x.payment.payerName ?? "") !== filterPaymentPayer) return false;
+        if (fromTs != null && x.paidAtTs < fromTs) return false;
+        if (toTs != null && x.paidAtTs > toTs) return false;
+        if (searchToken && !x.search.includes(searchToken)) return false;
+        return true;
+      })
+      .map((x) => x.payment);
+  }, [paymentFacts, shouldComputePaymentViews, filterMonth, filterYear, filterType, filterPaymentMethod, filterPaymentFeeTypeId, filterPaymentHouseholdId, filterPaymentCollector, filterPaymentPayer, filterPaymentFromDate, filterPaymentToDate, searchToken]);
+  const pagedReportPayments = useMemo(() => paymentView.slice((pageReportPayments - 1) * pageSize, pageReportPayments * pageSize), [paymentView, pageReportPayments]);
+  const paymentTimelinePageSize = 8;
+  const pagedPaymentsTab = useMemo(() => paymentView.slice((pagePaymentsTab - 1) * paymentTimelinePageSize, pagePaymentsTab * paymentTimelinePageSize), [paymentView, pagePaymentsTab]);
+
+
+  const totalHouseholdPages = Math.max(1, Math.ceil(filteredHouseholds.length / pageSize));
+  const totalResidentPages = Math.max(1, Math.ceil(filteredResidents.length / pageSize));
+  const totalEventPages = Math.max(1, Math.ceil(filteredEvents.length / pageSize));
+  const totalCommunicationPages = Math.max(1, Math.ceil(communications.length / pageSize));
+  const totalPaymentsTabPages = Math.max(1, Math.ceil(paymentView.length / paymentTimelinePageSize));
+  const totalReportPaymentPages = Math.max(1, Math.ceil(paymentView.length / pageSize));
+  const pagedEvents = useMemo(() => filteredEvents.slice((pageEvents - 1) * pageSize, pageEvents * pageSize), [filteredEvents, pageEvents]);
+  const pagedCommunications = useMemo(() => communications.slice((pageCommunications - 1) * pageSize, pageCommunications * pageSize), [communications, pageCommunications]);
+
+  useEffect(() => {
+    if (pageHouseholds > totalHouseholdPages) setPageHouseholds(totalHouseholdPages);
+  }, [pageHouseholds, totalHouseholdPages]);
+
+  useEffect(() => {
+    if (pageResidents > totalResidentPages) setPageResidents(totalResidentPages);
+  }, [pageResidents, totalResidentPages]);
+
+  useEffect(() => {
+    if (pageReportPayments > totalReportPaymentPages) setPageReportPayments(totalReportPaymentPages);
+  }, [pageReportPayments, totalReportPaymentPages]);
+
+  useEffect(() => {
+    if (pagePaymentsTab > totalPaymentsTabPages) setPagePaymentsTab(totalPaymentsTabPages);
+  }, [pagePaymentsTab, totalPaymentsTabPages]);
+
+  useEffect(() => {
+    if (pageEvents > totalEventPages) setPageEvents(totalEventPages);
+  }, [pageEvents, totalEventPages]);
+
+  useEffect(() => {
+    if (pageCommunications > totalCommunicationPages) setPageCommunications(totalCommunicationPages);
+  }, [pageCommunications, totalCommunicationPages]);
 
   const selectedObligation = obligations.find((o) => o.id === selectedObligationId);
   const selectablePaymentObligations = useMemo(() => {
     const rows = obligations
       .map((o) => {
-        const period = periods.find((p) => p.id === o.periodId);
+        const period = periodById.get(o.periodId);
         if (!period) return null;
         return { ...o, period };
       })
@@ -443,7 +592,7 @@ export default function Home() {
       if (selectedPaymentFeeTypeId && o.period.feeTypeId !== selectedPaymentFeeTypeId) return false;
       return o.amountDue - o.amountPaid > 0;
     });
-  }, [obligations, periods, selectedPaymentHouseholdId, selectedPaymentFeeTypeId]);
+  }, [obligations, periodById, selectedPaymentHouseholdId, selectedPaymentFeeTypeId]);
 
   const paymentHouseholdOutstanding = useMemo(() => {
     if (!selectedPaymentHouseholdId) return 0;
@@ -454,13 +603,13 @@ export default function Home() {
 
   const selectedObligationWithMeta = useMemo(() => {
     if (!selectedObligation) return null;
-    const period = periods.find((p) => p.id === selectedObligation.periodId);
+    const period = periodById.get(selectedObligation.periodId);
     if (!period) return null;
-    const feeType = feeTypes.find((f) => f.id === period.feeTypeId);
+    const feeType = feeTypeByIdMap.get(period.feeTypeId);
     const dueDate = new Date(period.year, period.month - 1, 1);
     const overdueDays = Math.max(0, Math.floor((Date.now() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
     return { period, feeType, overdueDays };
-  }, [selectedObligation, periods, feeTypes]);
+  }, [selectedObligation, periodById, feeTypeByIdMap]);
 
   useEffect(() => {
     if (selectablePaymentObligations.length === 0) {
@@ -472,11 +621,14 @@ export default function Home() {
   }, [selectablePaymentObligations, selectedObligationId]);
 
   const stats = useMemo(() => {
+    if (tab !== "dashboard") {
+      return { totalDue: 0, totalPaid: 0, outstanding: 0, paidHouseholds: 0 };
+    }
     const totalDue = obligations.reduce((s, o) => s + o.amountDue, 0);
     const totalPaid = obligations.reduce((s, o) => s + o.amountPaid, 0);
     const outstanding = totalDue - totalPaid;
     const overdueObligations = obligations.filter((o) => {
-      const period = periods.find((p) => p.id === o.periodId);
+      const period = periodById.get(o.periodId);
       if (!period) return false;
       const dueDate = new Date(period.year, period.month - 1, 1);
       return dueDate.getTime() < Date.now();
@@ -500,38 +652,41 @@ export default function Home() {
       if (householdOutstanding === 0) paidHouseholds += 1;
     }
     return { totalDue, totalPaid, outstanding, paidHouseholds };
-  }, [obligations, households, periods]);
+  }, [tab, obligations, households, periodById]);
 
   const monthlyChartData = useMemo(() => {
+    if (tab !== "dashboard") return [] as Array<{ label: string; value: number }>;
     const map = new Map<string, number>();
     for (const p of paymentView) {
-      const o = obligations.find((x) => x.id === p.obligationId);
-      const period = periods.find((x) => x.id === o?.periodId);
+      const o = obligationById.get(p.obligationId);
+      const period = o ? periodById.get(o.periodId) : null;
       if (!period) continue;
       const key = `${period.year}-${String(period.month).padStart(2, "0")}`;
       map.set(key, (map.get(key) ?? 0) + p.paidAmount);
     }
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([label, value]) => ({ label, value }));
-  }, [paymentView, obligations, periods]);
+  }, [tab, paymentView, obligationById, periodById]);
 
   const typeChartData = useMemo(() => {
+    if (tab !== "dashboard") return [] as Array<{ label: string; value: number }>;
     const map = new Map<string, number>();
     for (const p of paymentView) {
-      const ft = feeTypes.find((x) => x.id === p.feeTypeId);
+      const ft = feeTypeByIdMap.get(p.feeTypeId);
       if (!ft) continue;
       map.set(ft.name, (map.get(ft.name) ?? 0) + p.paidAmount);
     }
     return Array.from(map.entries()).map(([label, value]) => ({ label, value }));
-  }, [paymentView, feeTypes]);
+  }, [tab, paymentView, feeTypeByIdMap]);
 
   const paymentMethodDonutData = useMemo(() => {
+    if (tab !== "dashboard") return [] as Array<{ label: string; value: number; color: string }>;
     const cash = paymentView.filter((p) => p.method === "CASH").reduce((s, p) => s + p.paidAmount, 0);
     const bank = paymentView.filter((p) => p.method === "BANK").reduce((s, p) => s + p.paidAmount, 0);
     return [
       { label: t(lang, "paymentMethodCash"), value: cash, color: "#2f86ff" },
       { label: t(lang, "paymentMethodBank"), value: bank, color: "#10a3a3" },
     ];
-  }, [paymentView, lang]);
+  }, [tab, paymentView, lang]);
 
   const collectorOptions = useMemo(() => {
     return Array.from(new Set(payments.map((p) => p.collectorName.trim()).filter((x) => x.length > 0))).sort((a, b) => a.localeCompare(b));
@@ -971,7 +1126,7 @@ export default function Home() {
     if (!Number.isInteger(month) || month < 1 || month > 12) { setFieldError("newPeriodMonth", l(lang, "Tháng 1-12", "Month must be 1-12")); valid = false; } else clearFieldError("newPeriodMonth");
     if (!Number.isInteger(year) || year < 2000) { setFieldError("newPeriodYear", l(lang, "Năm không hợp lệ", "Invalid year")); valid = false; } else clearFieldError("newPeriodYear");
     if (!valid) return;
-    void apiPost(`${API_BASE}/periods`, { feeTypeId: newPeriodFeeTypeId, month, year }).then(async () => {
+    void apiPost(`${API_BASE}/periods`, { feeTypeId: newPeriodFeeTypeId, month, year, status: newPeriodStatus }).then(async () => {
       await refreshAllFromApi();
       await refreshAuditLogs();
     });
@@ -1280,24 +1435,26 @@ export default function Home() {
                  <article className="card">
                    <h3 className="subtitle">{l(lang, "Top căn hộ nợ cao", "Top outstanding households")}</h3>
                    {Array.from(
-                     obligations.reduce((map, o) => {
-                       const period = periods.find((p) => p.id === o.periodId);
-                       if (!period) return map;
-                       const dueDate = new Date(period.year, period.month - 1, 1);
-                       if (dueDate.getTime() >= Date.now()) return map;
-                       const key = o.householdId;
-                       const current = map.get(key) ?? { debt: 0, overdueFeeCount: 0 };
-                       const debt = Math.max(0, o.amountDue - o.amountPaid);
-                       if (debt > 0) {
-                         current.debt += debt;
-                         current.overdueFeeCount += 1;
+                     (() => {
+                       const map = new Map<number, { debt: number; overdueFeeCount: number }>();
+                       const nowTs = Date.now();
+                       for (const o of obligations) {
+                         const period = periodById.get(o.periodId);
+                         if (!period) continue;
+                         const dueTs = new Date(period.year, period.month - 1, 1).getTime();
+                         if (dueTs >= nowTs) continue;
+                         const debt = Math.max(0, o.amountDue - o.amountPaid);
+                         if (debt <= 0) continue;
+                         const prev = map.get(o.householdId) ?? { debt: 0, overdueFeeCount: 0 };
+                         prev.debt += debt;
+                         prev.overdueFeeCount += 1;
+                         map.set(o.householdId, prev);
                        }
-                       map.set(key, current);
                        return map;
-                     }, new Map<number, { debt: number; overdueFeeCount: number }>()),
+                     })(),
                    )
                      .map(([householdId, info]) => ({
-                       apartmentNo: households.find((h) => h.id === householdId)?.apartmentNo ?? String(householdId),
+                       apartmentNo: householdById.get(householdId)?.apartmentNo ?? String(householdId),
                        debt: info.debt,
                        overdueFeeCount: info.overdueFeeCount,
                      }))
@@ -1388,13 +1545,16 @@ export default function Home() {
 
               <div className="table-wrap mt-3">
                 <table>
-                  <thead><tr><th>{t(lang, "apartment")}</th><th>{t(lang, "owner")}</th><th>{l(lang, "Sở hữu", "Ownership")}</th><th>{l(lang, "Khẩn cấp", "Emergency")}</th><th>{l(lang, "Xe", "Parking")}</th><th>{l(lang, "Ngày vào", "Move-in")}</th><th>{l(lang, "Nhắc phí", "Remind")}</th></tr></thead>
+                  <thead><tr><th>{t(lang, "apartment")}</th><th>{t(lang, "owner")}</th><th>{l(lang, "Cư dân", "Residents")}</th><th>{l(lang, "Sở hữu", "Ownership")}</th><th>{l(lang, "Tầng", "Floor")}</th><th>{l(lang, "Diện tích", "Area")}</th><th>{l(lang, "Khẩn cấp", "Emergency")}</th><th>{l(lang, "Xe", "Parking")}</th><th>{l(lang, "Ngày vào", "Move-in")}</th><th>{l(lang, "Nhắc phí", "Remind")}</th></tr></thead>
                   <tbody>
                     {pagedHouseholds.map((h) => (
                       <tr key={h.id}>
                         <td>{h.apartmentNo}</td>
                         <td>{h.ownerName} ({h.ownerPhone})</td>
+                        <td>{residentCountByHouseholdId.get(h.id) ?? 0}</td>
                         <td><span className={`pill ${h.ownershipStatus === "TENANT" ? "pill-tenant" : "pill-owner"}`}>{h.ownershipStatus === "TENANT" ? l(lang, "Thuê", "Tenant") : l(lang, "Chủ", "Owner")}</span></td>
+                        <td>{h.floorNo}</td>
+                        <td>{h.areaM2}</td>
                         <td>{h.emergencyContactName || "-"} {h.emergencyContactPhone ? `(${h.emergencyContactPhone})` : ""}</td>
                         <td>{h.parkingSlots ?? 0}</td>
                         <td>{h.moveInDate ? new Date(h.moveInDate).toLocaleDateString("vi-VN") : "-"}</td>
@@ -1428,38 +1588,17 @@ export default function Home() {
               <div className="flex gap-2 mt-2">
                 <button className="btn-secondary" disabled={pageHouseholds <= 1} onClick={() => setPageHouseholds((p) => Math.max(1, p - 1))}>{l(lang, "Trước", "Prev")}</button>
                 <button className="btn-secondary" disabled={pageHouseholds * pageSize >= filteredHouseholds.length} onClick={() => setPageHouseholds((p) => p + 1)}>{l(lang, "Sau", "Next")}</button>
+                <span className="muted">{l(lang, "Trang", "Page")} {pageHouseholds}/{totalHouseholdPages}</span>
+                <input className="input" style={{ width: 96 }} type="number" min={1} max={totalHouseholdPages} value={pageHouseholds} onChange={(e) => {
+                  const next = Number(e.target.value);
+                  if (!Number.isFinite(next)) return;
+                  setPageHouseholds(Math.min(totalHouseholdPages, Math.max(1, Math.trunc(next))));
+                }} />
               </div>
-
-              {inspectHouseholdId && (() => {
-                const hh = households.find((x) => x.id === inspectHouseholdId);
-                if (!hh) return null;
-                const hhResidents = residents.filter((r) => r.householdId === hh.id);
-                const hhObligations = obligations.filter((o) => o.householdId === hh.id);
-                const hhDebt = hhObligations.reduce((s, o) => s + Math.max(0, o.amountDue - o.amountPaid), 0);
-                return (
-                  <section className="card mt-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="subtitle">{l(lang, "Chi tiết căn", "Household inspection")}: {hh.apartmentNo}</h3>
-                      <button className="btn-secondary" onClick={() => setInspectHouseholdId(null)}>{l(lang, "Đóng", "Close")}</button>
-                    </div>
-                    <p className="muted mt-2">{l(lang, "Chủ hộ", "Owner")}: {hh.ownerName} ({hh.ownerPhone})</p>
-                    <p className="muted">{l(lang, "Số xe đăng ký", "Registered vehicles/slots")}: {hh.parkingSlots ?? 0}</p>
-                    <p className="muted">{l(lang, "Tổng nợ hiện tại", "Current outstanding debt")}: {formatVnd(hhDebt)}</p>
-                    <h4 className="subtitle mt-3">{l(lang, "Người trong hộ", "Residents")}</h4>
-                    {hhResidents.length === 0 ? <p className="muted">{l(lang, "Chưa có cư dân", "No residents")}</p> : hhResidents.map((r) => <p key={r.id} className="muted">- {r.fullName} ({r.residentType})</p>)}
-                    <h4 className="subtitle mt-3">{l(lang, "Nợ theo khoản phí", "Debt by fee")}</h4>
-                    {hhObligations.length === 0 ? <p className="muted">{l(lang, "Chưa phát sinh nghĩa vụ", "No obligations")}</p> : hhObligations.map((o) => {
-                      const period = periods.find((p) => p.id === o.periodId);
-                      const ft = feeTypes.find((f) => f.id === period?.feeTypeId);
-                      return <p key={o.id} className="muted">- {ft?.name ?? "-"} {period ? `(${period.month}/${period.year})` : ""}: {formatVnd(Math.max(0, o.amountDue - o.amountPaid))}</p>;
-                    })}
-                  </section>
-                );
-              })()}
 
               <h3 className="subtitle mt-4">{l(lang, "Lịch sử nhắc phí", "Communication logs")}</h3>
               <div className="timeline mt-2">
-                {communications.slice(0, 8).map((c) => (
+                {pagedCommunications.map((c) => (
                   <article className="timeline-item" key={c.id}>
                     <div className="timeline-top">
                       <strong>{c.household?.apartmentNo ?? c.householdId}</strong>
@@ -1470,6 +1609,18 @@ export default function Home() {
                   </article>
                 ))}
               </div>
+
+              <section className="card mt-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="subtitle">{l(lang, "Tra cứu nhanh căn hộ", "Quick household inspection")}</h3>
+                  <input className="input" style={{ maxWidth: 260 }} value={inspectHouseholdSearch} onChange={(e) => setInspectHouseholdSearch(e.target.value)} placeholder={l(lang, "Tìm theo căn/chủ hộ", "Search by apartment/owner")} />
+                </div>
+                <div className="grid gap-2 mt-2 md:grid-cols-4">
+                  {inspectHouseholdList.slice(0, 12).map((h) => (
+                    <button key={h.id} className="btn-secondary" onClick={() => { setInspectHouseholdId(h.id); setTab("households"); }}>{h.apartmentNo} - {h.ownerName}</button>
+                  ))}
+                </div>
+              </section>
             </section>
           )}
 
@@ -1529,8 +1680,8 @@ export default function Home() {
               </section>
               <div className="table-wrap mt-3">
                 <table>
-                  <thead><tr><th><input type="checkbox" checked={filteredFeeTypes.length > 0 && filteredFeeTypes.every((x) => selectedFeeTypeIds.includes(x.id))} onChange={(e) => setSelectedFeeTypeIds(e.target.checked ? filteredFeeTypes.map((x) => x.id) : [])} /></th><th>{t(lang, "code")}</th><th>{t(lang, "name")}</th><th>{t(lang, "rate")}</th><th>{l(lang, "Ân hạn", "Grace")}</th><th>{l(lang, "Phạt trễ", "Late rule")}</th><th>{l(lang, "Thao tác", "Actions")}</th></tr></thead>
-                  <tbody>{filteredFeeTypes.map((f) => <tr key={f.id}><td><input type="checkbox" checked={selectedFeeTypeIds.includes(f.id)} onChange={() => toggleFeeTypeSelection(f.id)} /></td><td>{f.code}</td><td>{f.name}</td><td>{formatVnd(f.rate)}</td><td>{f.graceDays ?? 0}</td><td>{f.lateFeeRule || "-"}</td><td><div className="flex gap-2"><button className="btn-secondary" onClick={() => {
+                  <thead><tr><th><input type="checkbox" checked={filteredFeeTypes.length > 0 && filteredFeeTypes.every((x) => selectedFeeTypeIds.includes(x.id))} onChange={(e) => setSelectedFeeTypeIds(e.target.checked ? filteredFeeTypes.map((x) => x.id) : [])} /></th><th>{t(lang, "code")}</th><th>{t(lang, "name")}</th><th>{t(lang, "category")}</th><th>{t(lang, "method")}</th><th>{t(lang, "rate")}</th><th>{l(lang, "Ân hạn", "Grace")}</th><th>{l(lang, "Phạt trễ", "Late rule")}</th><th>{l(lang, "Thao tác", "Actions")}</th></tr></thead>
+                  <tbody>{filteredFeeTypes.map((f) => <tr key={f.id}><td><input type="checkbox" checked={selectedFeeTypeIds.includes(f.id)} onChange={() => toggleFeeTypeSelection(f.id)} /></td><td>{f.code}</td><td>{f.name}</td><td>{f.category}</td><td>{f.calcMethod}</td><td>{formatVnd(f.rate)}</td><td>{f.graceDays ?? 0}</td><td>{f.lateFeeRule || "-"}</td><td><div className="flex gap-2"><button className="btn-secondary" onClick={() => {
                     setEditingFeeTypeId(f.id);
                     setNewFeeCode(f.code);
                     setNewFeeName(f.name);
@@ -1593,7 +1744,7 @@ export default function Home() {
                   <button className="btn-secondary" onClick={() => { setFilterPeriodQuery(""); setFilterPeriodStatus("all"); setFilterPeriodFeeTypeId("all"); }}>{l(lang, "Xóa lọc", "Clear filter")}</button>
                 </div>
               </section>
-              <div className="table-wrap mt-3"><table><thead><tr><th>ID</th><th>{t(lang, "name")}</th><th>{t(lang, "month")}</th><th>{t(lang, "year")}</th><th>{t(lang, "status")}</th><th>{l(lang, "Thao tác", "Actions")}</th></tr></thead><tbody>{filteredPeriods.map((p) => <tr key={p.id}><td>{p.id}</td><td>{feeTypes.find((f) => f.id === p.feeTypeId)?.name}</td><td>{p.month}</td><td>{p.year}</td><td>{p.status}</td><td><div className="flex gap-2"><button className="btn-secondary" onClick={() => {
+              <div className="table-wrap mt-3"><table><thead><tr><th>ID</th><th>{t(lang, "name")}</th><th>{t(lang, "month")}</th><th>{t(lang, "year")}</th><th>{t(lang, "status")}</th><th>{l(lang, "Bắt đầu", "Start")}</th><th>{l(lang, "Kết thúc", "End")}</th><th>{l(lang, "Thao tác", "Actions")}</th></tr></thead><tbody>{filteredPeriods.map((p) => <tr key={p.id}><td>{p.id}</td><td>{feeTypeByIdMap.get(p.feeTypeId)?.name}</td><td>{p.month}</td><td>{p.year}</td><td>{p.status}</td><td>{p.startDate ? new Date(p.startDate).toLocaleDateString("vi-VN") : "-"}</td><td>{p.endDate ? new Date(p.endDate).toLocaleDateString("vi-VN") : "-"}</td><td><div className="flex gap-2"><button className="btn-secondary" onClick={() => {
                 setEditingPeriodId(p.id);
                 setNewPeriodFeeTypeId(p.feeTypeId);
                 setNewPeriodMonth(String(p.month));
@@ -1621,9 +1772,7 @@ export default function Home() {
               <div className="grid gap-3 md:grid-cols-3 mt-3">
                 <select className="input" value={selectedPaymentHouseholdId} onChange={(e) => setSelectedPaymentHouseholdId(Number(e.target.value))}>
                   {households.map((h) => {
-                    const outstanding = obligations
-                      .filter((o) => o.householdId === h.id)
-                      .reduce((s, o) => s + Math.max(0, o.amountDue - o.amountPaid), 0);
+                    const outstanding = householdOutstandingById.get(h.id) ?? 0;
                     return <option key={h.id} value={h.id}>{h.apartmentNo} | {l(lang, "Nợ", "Debt")}: {formatVnd(outstanding)}</option>;
                   })}
                 </select>
@@ -1634,9 +1783,9 @@ export default function Home() {
                 <select className="input" value={selectedObligationId} onChange={(e) => setSelectedObligationId(Number(e.target.value))}>
                   {selectablePaymentObligations.length === 0 && <option value={0}>{l(lang, "Không có khoản nợ phù hợp", "No matching outstanding obligation")}</option>}
                   {selectablePaymentObligations.map((o) => {
-                    const h = households.find((x) => x.id === o.householdId);
+                    const h = householdById.get(o.householdId);
                     const period = o.period;
-                    const ft = feeTypes.find((x) => x.id === period.feeTypeId);
+                    const ft = feeTypeByIdMap.get(period.feeTypeId);
                     return <option key={o.id} value={o.id}>{h?.apartmentNo} | {ft?.name} | {formatVnd(o.amountDue - o.amountPaid)}</option>;
                   })}
                 </select>
@@ -1677,7 +1826,16 @@ export default function Home() {
 
               <section className="card mt-3">
                 <h3 className="subtitle">{l(lang, "Bộ lọc giao dịch", "Payment filters")}</h3>
+                <p className="muted mt-1">{l(lang, "Hiện có", "Currently")}: {paymentView.length} {l(lang, "bản ghi sau lọc", "records after filters")}</p>
                 <div className="grid gap-2 mt-2 md:grid-cols-5">
+                  <select className="input" value={String(filterPaymentHouseholdId)} onChange={(e) => setFilterPaymentHouseholdId(e.target.value === "all" ? "all" : Number(e.target.value))}>
+                    <option value="all">{l(lang, "Mọi căn hộ", "All households")}</option>
+                    {households.map((h) => <option key={h.id} value={h.id}>{h.apartmentNo}</option>)}
+                  </select>
+                  <select className="input" value={String(filterPaymentFeeTypeId)} onChange={(e) => setFilterPaymentFeeTypeId(e.target.value === "all" ? "all" : Number(e.target.value))}>
+                    <option value="all">{l(lang, "Mọi khoản phí", "All fee types")}</option>
+                    {feeTypes.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  </select>
                   <select className="input" value={filterPaymentCollector} onChange={(e) => setFilterPaymentCollector(e.target.value)}>
                   <option value="">{l(lang, "Mọi người thu", "All collectors")}</option>
                   {collectorOptions.map((x) => <option key={x} value={x}>{x}</option>)}
@@ -1693,12 +1851,21 @@ export default function Home() {
                   </select>
                   <input className="input" type="date" value={filterPaymentFromDate} onChange={(e) => setFilterPaymentFromDate(e.target.value)} />
                   <input className="input" type="date" value={filterPaymentToDate} onChange={(e) => setFilterPaymentToDate(e.target.value)} />
+                  <button className="btn-secondary" onClick={() => {
+                    setFilterPaymentHouseholdId("all");
+                    setFilterPaymentFeeTypeId("all");
+                    setFilterPaymentCollector("");
+                    setFilterPaymentPayer("");
+                    setFilterPaymentMethod("all");
+                    setFilterPaymentFromDate("");
+                    setFilterPaymentToDate("");
+                  }}>{l(lang, "Xóa lọc", "Clear filters")}</button>
                 </div>
               </section>
 
               <h3 className="subtitle mt-4">{l(lang, "Dòng thời gian giao dịch", "Payment timeline")}</h3>
               <div className="timeline mt-2">
-                {paymentView.slice(0, 8).map((p) => (
+                {pagedPaymentsTab.map((p) => (
                   <article className="timeline-item" key={p.id}>
                     <div className="timeline-top"><strong>{p.receiptNo}</strong><strong>{formatVnd(p.paidAmount)}</strong></div>
                     <p className="muted mt-1">{p.collectorName} • {new Date(p.paidAt).toLocaleString("vi-VN")}</p>
@@ -1720,6 +1887,16 @@ export default function Home() {
                     </div>
                   </article>
                 ))}
+              </div>
+              <div className="flex gap-2 mt-2">
+                <button className="btn-secondary" disabled={pagePaymentsTab <= 1} onClick={() => setPagePaymentsTab((p) => Math.max(1, p - 1))}>{l(lang, "Trước", "Prev")}</button>
+                <button className="btn-secondary" disabled={pagePaymentsTab * paymentTimelinePageSize >= paymentView.length} onClick={() => setPagePaymentsTab((p) => p + 1)}>{l(lang, "Sau", "Next")}</button>
+                <span className="muted">{l(lang, "Trang", "Page")} {pagePaymentsTab}/{totalPaymentsTabPages}</span>
+                <input className="input" style={{ width: 96 }} type="number" min={1} max={totalPaymentsTabPages} value={pagePaymentsTab} onChange={(e) => {
+                  const next = Number(e.target.value);
+                  if (!Number.isFinite(next)) return;
+                  setPagePaymentsTab(Math.min(totalPaymentsTabPages, Math.max(1, Math.trunc(next))));
+                }} />
               </div>
             </section>
           )}
@@ -1751,7 +1928,7 @@ export default function Home() {
                   <button className="btn-primary" onClick={addResident}>{t(lang, "addResident")}</button>
                 )}
               </div>
-              <div className="table-wrap mt-3"><table><thead><tr><th><input type="checkbox" checked={pagedResidents.length > 0 && pagedResidents.every((x) => selectedResidentIds.includes(x.id))} onChange={(e) => setSelectedResidentIds(e.target.checked ? Array.from(new Set([...selectedResidentIds, ...pagedResidents.map((x) => x.id)])) : selectedResidentIds.filter((id) => !pagedResidents.some((x) => x.id === id)))} /></th><th>{t(lang, "fullName")}</th><th>{t(lang, "apartment")}</th><th>{t(lang, "dob")}</th><th>{t(lang, "idNo")}</th><th>{l(lang, "Thao tác", "Actions")}</th></tr></thead><tbody>{pagedResidents.map((r) => <tr key={r.id}><td><input type="checkbox" checked={selectedResidentIds.includes(r.id)} onChange={() => toggleResidentSelection(r.id)} /></td><td>{r.fullName}</td><td>{households.find((x) => x.id === r.householdId)?.apartmentNo}</td><td>{new Date(r.dob).toLocaleDateString("vi-VN")}</td><td>{r.idNo}</td><td><div className="flex gap-2"><button className="btn-secondary" onClick={() => {
+              <div className="table-wrap mt-3"><table><thead><tr><th><input type="checkbox" checked={pagedResidents.length > 0 && pagedResidents.every((x) => selectedResidentIds.includes(x.id))} onChange={(e) => setSelectedResidentIds(e.target.checked ? Array.from(new Set([...selectedResidentIds, ...pagedResidents.map((x) => x.id)])) : selectedResidentIds.filter((id) => !pagedResidents.some((x) => x.id === id)))} /></th><th>{t(lang, "fullName")}</th><th>{t(lang, "apartment")}</th><th>{t(lang, "residentType")}</th><th>{t(lang, "dob")}</th><th>{t(lang, "idNo")}</th><th>{l(lang, "Thao tác", "Actions")}</th></tr></thead><tbody>{pagedResidents.map((r) => <tr key={r.id}><td><input type="checkbox" checked={selectedResidentIds.includes(r.id)} onChange={() => toggleResidentSelection(r.id)} /></td><td>{r.fullName}</td><td>{householdById.get(r.householdId)?.apartmentNo}</td><td>{r.residentType}</td><td>{new Date(r.dob).toLocaleDateString("vi-VN")}</td><td>{r.idNo}</td><td><div className="flex gap-2"><button className="btn-secondary" onClick={() => {
                 setEditingResidentId(r.id);
                 setNewResidentName(r.fullName);
                 setNewResidentHouseholdId(r.householdId);
@@ -1763,6 +1940,12 @@ export default function Home() {
               <div className="flex gap-2 mt-2">
                 <button className="btn-secondary" disabled={pageResidents <= 1} onClick={() => setPageResidents((p) => Math.max(1, p - 1))}>{l(lang, "Trước", "Prev")}</button>
                 <button className="btn-secondary" disabled={pageResidents * pageSize >= filteredResidents.length} onClick={() => setPageResidents((p) => p + 1)}>{l(lang, "Sau", "Next")}</button>
+                <span className="muted">{l(lang, "Trang", "Page")} {pageResidents}/{totalResidentPages}</span>
+                <input className="input" style={{ width: 96 }} type="number" min={1} max={totalResidentPages} value={pageResidents} onChange={(e) => {
+                  const next = Number(e.target.value);
+                  if (!Number.isFinite(next)) return;
+                  setPageResidents(Math.min(totalResidentPages, Math.max(1, Math.trunc(next))));
+                }} />
               </div>
               <button className="btn-danger mt-2" onClick={() => void bulkDeleteResidents()}>{l(lang, "Xóa đã chọn", "Delete selected")}</button>
               <div className="grid gap-2 mt-3 md:grid-cols-4">
@@ -1830,21 +2013,18 @@ export default function Home() {
                   <button className="btn-secondary" onClick={() => { setFilterEventQuery(""); setFilterEventType("all"); setFilterEventResidentId("all"); }}>{l(lang, "Xóa lọc", "Clear filter")}</button>
                 </div>
               </section>
-              <div className="timeline mt-3">
-                {filteredEvents.slice(0, 12).map((ev) => {
-                  const r = residents.find((x) => x.id === ev.residentId);
+              <div className="table-wrap mt-3"><table><thead><tr><th>{l(lang, "Cư dân", "Resident")}</th><th>{l(lang, "Loại", "Type")}</th><th>{l(lang, "Từ ngày", "From")}</th><th>{l(lang, "Đến ngày", "To")}</th><th>{l(lang, "Ghi chú", "Note")}</th><th>{l(lang, "Thao tác", "Actions")}</th></tr></thead><tbody>
+                {pagedEvents.map((ev) => {
+                  const r = residentById.get(ev.residentId);
                   return (
-                    <article className="timeline-item" key={ev.id}>
-                      <div className="timeline-top"><strong>{r?.fullName ?? ev.residentId}</strong><span className="muted">{ev.eventType}</span></div>
-                      <p className="muted mt-1">{new Date(ev.fromDate).toLocaleDateString("vi-VN")} - {ev.toDate ? new Date(ev.toDate).toLocaleDateString("vi-VN") : "-"}</p>
-                      <p className="muted">{ev.note}</p>
-                      <div className="flex gap-2 mt-2">
-                        <button className="btn-secondary" onClick={() => updateResidencyEvent(ev.id)}>{l(lang, "Sửa", "Edit")}</button>
-                        <button className="btn-danger" onClick={() => removeResidencyEvent(ev.id)}>{l(lang, "Xóa", "Delete")}</button>
-                      </div>
-                    </article>
+                    <tr key={ev.id}><td>{r?.fullName ?? ev.residentId}</td><td>{ev.eventType}</td><td>{new Date(ev.fromDate).toLocaleDateString("vi-VN")}</td><td>{ev.toDate ? new Date(ev.toDate).toLocaleDateString("vi-VN") : "-"}</td><td>{ev.note}</td><td><div className="flex gap-2"><button className="btn-secondary" onClick={() => updateResidencyEvent(ev.id)}>{l(lang, "Sửa", "Edit")}</button><button className="btn-danger" onClick={() => removeResidencyEvent(ev.id)}>{l(lang, "Xóa", "Delete")}</button></div></td></tr>
                   );
                 })}
+              </tbody></table></div>
+              <div className="flex gap-2 mt-2">
+                <button className="btn-secondary" disabled={pageEvents <= 1} onClick={() => setPageEvents((p) => Math.max(1, p - 1))}>{l(lang, "Trước", "Prev")}</button>
+                <button className="btn-secondary" disabled={pageEvents * pageSize >= filteredEvents.length} onClick={() => setPageEvents((p) => p + 1)}>{l(lang, "Sau", "Next")}</button>
+                <span className="muted">{l(lang, "Trang", "Page")} {pageEvents}/{totalEventPages}</span>
               </div>
             </section>
           )}
@@ -1994,11 +2174,10 @@ export default function Home() {
                   <button className="btn-secondary" onClick={() => { setFilterUserQuery(""); setFilterUserRole("all"); setFilterUserStatus("all"); }}>{l(lang, "Xóa lọc", "Clear filter")}</button>
                 </div>
               </section>
-              <div className="table-wrap mt-3"><table><thead><tr><th>{t(lang, "username")}</th><th>{t(lang, "fullName")}</th><th>{t(lang, "role")}</th><th>{t(lang, "status")}</th></tr></thead><tbody>{filteredUsers.map((u) => <tr key={u.id}><td>{u.username}</td><td>{u.fullName}</td><td>{u.role}</td><td>{u.status}</td></tr>)}</tbody></table></div>
+              <div className="table-wrap mt-3"><table><thead><tr><th>{t(lang, "username")}</th><th>{t(lang, "fullName")}</th><th>{t(lang, "email")}</th><th>{t(lang, "phone")}</th><th>{t(lang, "role")}</th><th>{t(lang, "status")}</th></tr></thead><tbody>{filteredUsers.map((u) => <tr key={u.id}><td>{u.username}</td><td>{u.fullName}</td><td>{u.email}</td><td>{u.phone}</td><td>{u.role}</td><td>{u.status}</td></tr>)}</tbody></table></div>
               {user.role === "ADMIN" && (
-                <div className="table-wrap mt-3"><table><thead><tr><th>ID</th><th>{t(lang, "createdBy")}</th><th>{t(lang, "name")}</th><th>{t(lang, "status")}</th><th>{t(lang, "noteField")}</th></tr></thead><tbody>{auditLogs.map((a) => <tr key={a.id}><td>{a.id}</td><td>{a.actor?.fullName}</td><td>{a.entity}</td><td>{a.action}</td><td>{a.detail}</td></tr>)}</tbody></table></div>
+                <div className="table-wrap mt-3"><table><thead><tr><th>ID</th><th>{t(lang, "createdBy")}</th><th>{t(lang, "name")}</th><th>{t(lang, "status")}</th><th>{t(lang, "noteField")}</th><th>{l(lang, "Thời gian", "Time")}</th></tr></thead><tbody>{auditLogs.map((a) => <tr key={a.id}><td>{a.id}</td><td>{a.actor?.fullName}</td><td>{a.entity}</td><td>{a.action}</td><td>{a.detail}</td><td>{new Date(a.createdAt).toLocaleString("vi-VN")}</td></tr>)}</tbody></table></div>
               )}
-              <input className="input mt-2" value={resetPasswordValue} onChange={(e) => setResetPasswordValue(e.target.value)} placeholder={t(lang, "newPassword")} />
             </section>
           )}
 
@@ -2019,10 +2198,10 @@ export default function Home() {
               </div>
 
               <div className="card mt-3">
-                <h3 className="subtitle">{l(lang, "Bộ cột hiển thị", "Column visibility")}</h3>
+                <h3 className="subtitle">{l(lang, "Bộ cột hiển thị (báo cáo)", "Report column visibility")}</h3>
                 <div className="flex flex-wrap gap-2 mt-2">
-                  {Object.keys(showPaymentColumns).map((key) => (
-                    <button key={key} className={`btn-chip ${showPaymentColumns[key] ? "active" : ""}`} onClick={() => setShowPaymentColumns((prev) => ({ ...prev, [key]: !prev[key] }))}>{key}</button>
+                  {Object.keys(showReportPaymentColumns).map((key) => (
+                    <button key={key} className={`btn-chip ${showReportPaymentColumns[key] ? "active" : ""}`} onClick={() => setShowReportPaymentColumns((prev) => ({ ...prev, [key]: !prev[key] }))}>{key}</button>
                   ))}
                 </div>
               </div>
@@ -2034,33 +2213,33 @@ export default function Home() {
                   <table>
                     <thead>
                       <tr>
-                        {showPaymentColumns.receipt && <th>{t(lang, "receiptNo")}</th>}
-                        {showPaymentColumns.period && <th>{t(lang, "period")}</th>}
-                        {showPaymentColumns.fee && <th>{t(lang, "name")}</th>}
-                        {showPaymentColumns.amount && <th>{t(lang, "amount")}</th>}
-                        {showPaymentColumns.method && <th>{t(lang, "method")}</th>}
-                        {showPaymentColumns.collector && <th>{t(lang, "collector")}</th>}
-                        {showPaymentColumns.payer && <th>{l(lang, "Người nộp", "Payer")}</th>}
-                        {showPaymentColumns.txRef && <th>{l(lang, "Mã GD", "Tx Ref")}</th>}
-                        {showPaymentColumns.note && <th>{l(lang, "Ghi chú", "Note")}</th>}
+                        {showReportPaymentColumns.receipt && <th>{t(lang, "receiptNo")}</th>}
+                        {showReportPaymentColumns.period && <th>{t(lang, "period")}</th>}
+                        {showReportPaymentColumns.fee && <th>{t(lang, "name")}</th>}
+                        {showReportPaymentColumns.amount && <th>{t(lang, "amount")}</th>}
+                        {showReportPaymentColumns.method && <th>{t(lang, "method")}</th>}
+                        {showReportPaymentColumns.collector && <th>{t(lang, "collector")}</th>}
+                        {showReportPaymentColumns.payer && <th>{l(lang, "Người nộp", "Payer")}</th>}
+                        {showReportPaymentColumns.txRef && <th>{l(lang, "Mã GD", "Tx Ref")}</th>}
+                        {showReportPaymentColumns.note && <th>{l(lang, "Ghi chú", "Note")}</th>}
                       </tr>
                     </thead>
                     <tbody>
-                      {pagedPayments.map((p) => {
-                        const o = obligations.find((x) => x.id === p.obligationId);
-                        const period = periods.find((x) => x.id === o?.periodId);
-                        const ft = feeTypes.find((x) => x.id === p.feeTypeId);
+                      {pagedReportPayments.map((p) => {
+                        const o = obligationById.get(p.obligationId);
+                        const period = o ? periodById.get(o.periodId) : null;
+                        const ft = feeTypeByIdMap.get(p.feeTypeId);
                         return (
                           <tr key={p.id}>
-                            {showPaymentColumns.receipt && <td>{p.receiptNo}</td>}
-                            {showPaymentColumns.period && <td>{period?.month}/{period?.year}</td>}
-                            {showPaymentColumns.fee && <td>{ft?.name}</td>}
-                            {showPaymentColumns.amount && <td>{formatVnd(p.paidAmount)}</td>}
-                            {showPaymentColumns.method && <td>{p.method}</td>}
-                            {showPaymentColumns.collector && <td>{p.collectorName}</td>}
-                            {showPaymentColumns.payer && <td>{p.payerName || "-"}</td>}
-                            {showPaymentColumns.txRef && <td>{p.bankTxRef || "-"}</td>}
-                            {showPaymentColumns.note && <td>{p.note || "-"}</td>}
+                            {showReportPaymentColumns.receipt && <td>{p.receiptNo}</td>}
+                            {showReportPaymentColumns.period && <td>{period?.month}/{period?.year}</td>}
+                            {showReportPaymentColumns.fee && <td>{ft?.name}</td>}
+                            {showReportPaymentColumns.amount && <td>{formatVnd(p.paidAmount)}</td>}
+                            {showReportPaymentColumns.method && <td>{p.method}</td>}
+                            {showReportPaymentColumns.collector && <td>{p.collectorName}</td>}
+                            {showReportPaymentColumns.payer && <td>{p.payerName || "-"}</td>}
+                            {showReportPaymentColumns.txRef && <td>{p.bankTxRef || "-"}</td>}
+                            {showReportPaymentColumns.note && <td>{p.note || "-"}</td>}
                           </tr>
                         );
                       })}
@@ -2069,8 +2248,14 @@ export default function Home() {
                 </div>
               )}
               <div className="flex gap-2 mt-2">
-                <button className="btn-secondary" disabled={pagePayments <= 1} onClick={() => setPagePayments((p) => Math.max(1, p - 1))}>{l(lang, "Trước", "Prev")}</button>
-                <button className="btn-secondary" disabled={pagePayments * pageSize >= paymentView.length} onClick={() => setPagePayments((p) => p + 1)}>{l(lang, "Sau", "Next")}</button>
+                <button className="btn-secondary" disabled={pageReportPayments <= 1} onClick={() => setPageReportPayments((p) => Math.max(1, p - 1))}>{l(lang, "Trước", "Prev")}</button>
+                <button className="btn-secondary" disabled={pageReportPayments * pageSize >= paymentView.length} onClick={() => setPageReportPayments((p) => p + 1)}>{l(lang, "Sau", "Next")}</button>
+                <span className="muted">{l(lang, "Trang", "Page")} {pageReportPayments}/{totalReportPaymentPages}</span>
+                <input className="input" style={{ width: 96 }} type="number" min={1} max={totalReportPaymentPages} value={pageReportPayments} onChange={(e) => {
+                  const next = Number(e.target.value);
+                  if (!Number.isFinite(next)) return;
+                  setPageReportPayments(Math.min(totalReportPaymentPages, Math.max(1, Math.trunc(next))));
+                }} />
               </div>
 
               <div className="grid gap-4 md:grid-cols-2 mt-3">
@@ -2212,6 +2397,27 @@ export default function Home() {
         </div>
       </section>
       <HelpModal open={helpModal.open} title={helpModal.title} lines={helpModal.lines} onClose={() => setHelpModal({ open: false, title: "", lines: [] })} />
+      {inspectedHousehold && (
+        <div className="modal-backdrop" onClick={() => setInspectHouseholdId(null)}>
+          <section className="modal-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={l(lang, "Chi tiết căn", "Household inspection")}>
+            <div className="flex items-center justify-between">
+              <h3 className="subtitle">{l(lang, "Chi tiết căn", "Household inspection")}: {inspectedHousehold.hh.apartmentNo}</h3>
+              <button className="btn-secondary" onClick={() => setInspectHouseholdId(null)}>{l(lang, "Đóng", "Close")}</button>
+            </div>
+            <p className="muted mt-2">{l(lang, "Chủ hộ", "Owner")}: {inspectedHousehold.hh.ownerName} ({inspectedHousehold.hh.ownerPhone})</p>
+            <p className="muted">{l(lang, "Số xe đăng ký", "Registered vehicles/slots")}: {inspectedHousehold.hh.parkingSlots ?? 0}</p>
+            <p className="muted">{l(lang, "Tổng nợ hiện tại", "Current outstanding debt")}: {formatVnd(inspectedHousehold.hhDebt)}</p>
+            <h4 className="subtitle mt-3">{l(lang, "Người trong hộ", "Residents")}</h4>
+            {inspectedHousehold.hhResidents.length === 0 ? <p className="muted">{l(lang, "Chưa có cư dân", "No residents")}</p> : inspectedHousehold.hhResidents.map((r) => <p key={r.id} className="muted">- {r.fullName} ({r.residentType})</p>)}
+            <h4 className="subtitle mt-3">{l(lang, "Nợ theo khoản phí", "Debt by fee")}</h4>
+            {inspectedHousehold.hhObligations.filter((o) => Math.max(0, o.amountDue - o.amountPaid) > 0).length === 0 ? <p className="muted">{l(lang, "Không có khoản nợ", "No outstanding debt")}</p> : inspectedHousehold.hhObligations.filter((o) => Math.max(0, o.amountDue - o.amountPaid) > 0).map((o) => {
+              const period = periodById.get(o.periodId);
+              const ft = period ? feeTypeByIdMap.get(period.feeTypeId) : null;
+              return <p key={o.id} className="muted">- {ft?.name ?? "-"} {period ? `(${period.month}/${period.year})` : ""}: {formatVnd(Math.max(0, o.amountDue - o.amountPaid))}</p>;
+            })}
+          </section>
+        </div>
+      )}
     </main>
   );
 }

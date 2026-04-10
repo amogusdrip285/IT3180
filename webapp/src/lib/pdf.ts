@@ -1,5 +1,33 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
+function toSafePdfText(input: string): string {
+  const viMap: Record<string, string> = {
+    a: "áàảãạăắằẳẵặâấầẩẫậ",
+    A: "ÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬ",
+    d: "đ",
+    D: "Đ",
+    e: "éèẻẽẹêếềểễệ",
+    E: "ÉÈẺẼẸÊẾỀỂỄỆ",
+    i: "íìỉĩị",
+    I: "ÍÌỈĨỊ",
+    o: "óòỏõọôốồổỗộơớờởỡợ",
+    O: "ÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢ",
+    u: "úùủũụưứừửữự",
+    U: "ÚÙỦŨỤƯỨỪỬỮỰ",
+    y: "ýỳỷỹỵ",
+    Y: "ÝỲỶỸỴ",
+  };
+
+  let text = input;
+  for (const [ascii, chars] of Object.entries(viMap)) {
+    const re = new RegExp(`[${chars}]`, "g");
+    text = text.replace(re, ascii);
+  }
+
+  text = text.replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/…/g, "...");
+  return text;
+}
+
 export async function makeSimplePdf(title: string, subtitle: string, lines: string[]): Promise<Buffer> {
   const pdf = await PDFDocument.create();
   const page = pdf.addPage([595.28, 841.89]);
@@ -11,8 +39,9 @@ export async function makeSimplePdf(title: string, subtitle: string, lines: stri
   let y = page.getHeight() - margin;
 
   function drawWrappedText(text: string, size: number, bold = false, color = rgb(0, 0, 0)) {
+    const safeText = toSafePdfText(text);
     const font = bold ? fontBold : fontRegular;
-    const words = text.split(" ");
+    const words = safeText.split(" ");
     let current = "";
     const lineHeight = size + 4;
 

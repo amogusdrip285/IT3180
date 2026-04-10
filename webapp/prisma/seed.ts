@@ -58,6 +58,11 @@ async function main() {
         status: "ACTIVE",
       },
     }),
+    prisma.user.create({ data: { username: "acct_01", email: "acct01@bluemoon.vn", phone: "0912.000.011", fullName: "Hoàng Ngọc Linh", role: "ACCOUNTANT", passwordHash: hashPassword("accountant"), status: "ACTIVE" } }),
+    prisma.user.create({ data: { username: "acct_02", email: "acct02@bluemoon.vn", phone: "0912.000.012", fullName: "Vũ Thành Nam", role: "ACCOUNTANT", passwordHash: hashPassword("accountant"), status: "ACTIVE" } }),
+    prisma.user.create({ data: { username: "leader_01", email: "leader01@bluemoon.vn", phone: "0912.000.013", fullName: "Phan Trúc Mai", role: "TEAM_LEADER", passwordHash: hashPassword("leader"), status: "ACTIVE" } }),
+    prisma.user.create({ data: { username: "leader_02", email: "leader02@bluemoon.vn", phone: "0912.000.014", fullName: "Lưu Quốc Thắng", role: "TEAM_LEADER", passwordHash: hashPassword("leader"), status: "ACTIVE" } }),
+    prisma.user.create({ data: { username: "support_01", email: "support01@bluemoon.vn", phone: "0912.000.015", fullName: "Đặng Thu Hiền", role: "TEAM_LEADER", passwordHash: hashPassword("leader"), status: "BLOCKED" } }),
   ]);
 
   const [adminRole, accountantRole, leaderRole] = await Promise.all([
@@ -104,10 +109,15 @@ async function main() {
       { userId: createdUsers[0].id, roleId: adminRole.id },
       { userId: createdUsers[1].id, roleId: accountantRole.id },
       { userId: createdUsers[2].id, roleId: leaderRole.id },
+      { userId: createdUsers[3].id, roleId: accountantRole.id },
+      { userId: createdUsers[4].id, roleId: accountantRole.id },
+      { userId: createdUsers[5].id, roleId: leaderRole.id },
+      { userId: createdUsers[6].id, roleId: leaderRole.id },
+      { userId: createdUsers[7].id, roleId: leaderRole.id },
     ],
   });
 
-  const households = await Promise.all([
+  const baseHouseholds = await Promise.all([
     prisma.household.create({ data: { apartmentNo: "A-1203", floorNo: 12, ownerName: "Nguyễn Văn An", ownerPhone: "0903.111.203", emergencyContactName: "Nguyễn Thị Mai", emergencyContactPhone: "0909.100.203", parkingSlots: 1, moveInDate: new Date("2022-05-01"), ownershipStatus: "OWNER", contractEndDate: null, areaM2: 68, status: "ACTIVE" } }),
     prisma.household.create({ data: { apartmentNo: "B-1805", floorNo: 18, ownerName: "Trần Thị Hoa", ownerPhone: "0903.222.805", emergencyContactName: "Trần Văn Huy", emergencyContactPhone: "0909.200.805", parkingSlots: 2, moveInDate: new Date("2021-10-12"), ownershipStatus: "OWNER", contractEndDate: null, areaM2: 82, status: "ACTIVE" } }),
     prisma.household.create({ data: { apartmentNo: "C-2201", floorNo: 22, ownerName: "Lê Minh Đức", ownerPhone: "0903.333.201", emergencyContactName: "Lê Thu Hà", emergencyContactPhone: "0909.300.201", parkingSlots: 1, moveInDate: new Date("2023-01-20"), ownershipStatus: "TENANT", contractEndDate: new Date("2027-01-20"), areaM2: 95, status: "ACTIVE" } }),
@@ -120,33 +130,98 @@ async function main() {
     prisma.household.create({ data: { apartmentNo: "D-0301", floorNo: 3, ownerName: "Trịnh Tuấn Khang", ownerPhone: "0903.101.301", emergencyContactName: "Trịnh Thu An", emergencyContactPhone: "0909.101.301", parkingSlots: 1, moveInDate: new Date("2024-01-05"), ownershipStatus: "TENANT", contractEndDate: new Date("2026-10-01"), areaM2: 64, status: "ACTIVE" } }),
   ]);
 
+  const generatedHouseholds = await Promise.all(
+    Array.from({ length: 20 }, (_, idx) => {
+      const floorNo = 2 + (idx % 25);
+      const apartmentNo = `${String.fromCharCode(68 + (idx % 3))}-${String(floorNo).padStart(2, "0")}${String((idx % 8) + 1).padStart(2, "0")}`;
+      return prisma.household.create({
+        data: {
+          apartmentNo,
+          floorNo,
+          ownerName: `Hộ gia đình ${idx + 11}`,
+          ownerPhone: `0908.${String(200000 + idx).padStart(6, "0")}`,
+          emergencyContactName: `Người thân ${idx + 11}`,
+          emergencyContactPhone: `0911.${String(300000 + idx).padStart(6, "0")}`,
+          parkingSlots: (idx % 3) + 1,
+          moveInDate: new Date(2019 + (idx % 7), idx % 12, (idx % 24) + 1),
+          ownershipStatus: idx % 4 === 0 ? "TENANT" : "OWNER",
+          contractEndDate: idx % 4 === 0 ? new Date(2027, idx % 12, 1) : null,
+          areaM2: 58 + (idx % 9) * 6,
+          status: "ACTIVE",
+        },
+      });
+    }),
+  );
+
+  const households = [...baseHouseholds, ...generatedHouseholds];
+
   await prisma.communicationLog.createMany({
-    data: [
-      { householdId: households[0].id, channel: "SMS", status: "SENT", sentAt: new Date("2026-03-03"), note: "Nhac dong phi thang 3" },
-      { householdId: households[2].id, channel: "EMAIL", status: "SENT", sentAt: new Date("2026-03-04"), note: "Thong bao no qua han" },
-      { householdId: households[3].id, channel: "ZALO", status: "FAILED", sentAt: new Date("2026-03-05"), note: "Khong ket noi duoc" },
-    ],
+    data: households.flatMap((h, idx) => [
+      { householdId: h.id, channel: idx % 2 === 0 ? "SMS" : "EMAIL", status: "SENT", sentAt: new Date(2026, 2, 3 + (idx % 10)), note: "Nhắc đóng phí định kỳ" },
+      { householdId: h.id, channel: idx % 3 === 0 ? "ZALO" : "NOTICE", status: idx % 4 === 0 ? "FAILED" : "SENT", sentAt: new Date(2026, 3, 8 + (idx % 10)), note: idx % 4 === 0 ? "Không gửi được, cần gọi trực tiếp" : "Thông báo công nợ tháng mới" },
+    ]),
+  });
+
+  const extraResidentSeeds = generatedHouseholds.flatMap((h, idx) => {
+    const count = (idx % 4) + 1;
+    return Array.from({ length: count }, (_, n) => ({
+      householdId: h.id,
+      fullName: `Thành viên ${idx + 11}-${n + 1}`,
+      dob: new Date(1978 + ((idx + n) % 35), (idx + n) % 12, ((idx + n) % 26) + 1),
+      gender: (n % 3 === 0 ? "MALE" : n % 3 === 1 ? "FEMALE" : "OTHER") as "MALE" | "FEMALE" | "OTHER",
+      idNo: `099${String(100000000 + idx * 10 + n)}`,
+      residentType: (n <= 1 ? "PERMANENT" : "TEMPORARY") as "PERMANENT" | "TEMPORARY",
+    }));
   });
 
   const residents = await Promise.all([
     prisma.resident.create({ data: { householdId: households[0].id, fullName: "Nguyễn Văn An", dob: new Date("1987-02-03"), gender: "MALE", idNo: "012345678901", residentType: "PERMANENT" } }),
     prisma.resident.create({ data: { householdId: households[0].id, fullName: "Nguyễn Thị Mai", dob: new Date("1990-06-11"), gender: "FEMALE", idNo: "012345678902", residentType: "PERMANENT" } }),
+
     prisma.resident.create({ data: { householdId: households[1].id, fullName: "Trần Thị Hoa", dob: new Date("1984-03-20"), gender: "FEMALE", idNo: "012345678903", residentType: "PERMANENT" } }),
+    prisma.resident.create({ data: { householdId: households[1].id, fullName: "Trần Văn Huy", dob: new Date("1982-08-14"), gender: "MALE", idNo: "012345678913", residentType: "PERMANENT" } }),
+    prisma.resident.create({ data: { householdId: households[1].id, fullName: "Trần Gia Bảo", dob: new Date("2014-04-09"), gender: "MALE", idNo: "012345678914", residentType: "PERMANENT" } }),
+
     prisma.resident.create({ data: { householdId: households[2].id, fullName: "Lê Minh Đức", dob: new Date("1982-12-09"), gender: "MALE", idNo: "012345678904", residentType: "PERMANENT" } }),
+    prisma.resident.create({ data: { householdId: households[2].id, fullName: "Lê Thu Hà", dob: new Date("1985-01-18"), gender: "FEMALE", idNo: "012345678915", residentType: "PERMANENT" } }),
+    prisma.resident.create({ data: { householdId: households[2].id, fullName: "Lê Gia Khánh", dob: new Date("2011-10-22"), gender: "MALE", idNo: "012345678916", residentType: "PERMANENT" } }),
+    prisma.resident.create({ data: { householdId: households[2].id, fullName: "Lê Bảo Ngọc", dob: new Date("2017-07-03"), gender: "FEMALE", idNo: "012345678917", residentType: "PERMANENT" } }),
+
     prisma.resident.create({ data: { householdId: households[3].id, fullName: "Phạm Hồng Hải", dob: new Date("1993-01-15"), gender: "MALE", idNo: "012345678905", residentType: "PERMANENT" } }),
+    prisma.resident.create({ data: { householdId: households[3].id, fullName: "Phạm Huyền", dob: new Date("1996-02-01"), gender: "FEMALE", idNo: "012345678918", residentType: "TEMPORARY" } }),
+
     prisma.resident.create({ data: { householdId: households[4].id, fullName: "Đào Thị Lan", dob: new Date("1991-09-29"), gender: "FEMALE", idNo: "012345678906", residentType: "PERMANENT" } }),
+    prisma.resident.create({ data: { householdId: households[4].id, fullName: "Đào Quang", dob: new Date("1989-11-30"), gender: "MALE", idNo: "012345678919", residentType: "PERMANENT" } }),
+    prisma.resident.create({ data: { householdId: households[4].id, fullName: "Đào Mai Chi", dob: new Date("2016-09-12"), gender: "FEMALE", idNo: "012345678920", residentType: "PERMANENT" } }),
+
     prisma.resident.create({ data: { householdId: households[5].id, fullName: "Vũ Quốc Bình", dob: new Date("1988-07-05"), gender: "MALE", idNo: "012345678907", residentType: "PERMANENT" } }),
     prisma.resident.create({ data: { householdId: households[5].id, fullName: "Vũ Ngọc Anh", dob: new Date("2001-11-18"), gender: "FEMALE", idNo: "012345678908", residentType: "TEMPORARY" } }),
+    prisma.resident.create({ data: { householdId: households[5].id, fullName: "Vũ Hoàng Nam", dob: new Date("2010-05-17"), gender: "MALE", idNo: "012345678921", residentType: "PERMANENT" } }),
+    prisma.resident.create({ data: { householdId: households[5].id, fullName: "Vũ Thảo Vy", dob: new Date("2019-06-21"), gender: "FEMALE", idNo: "012345678922", residentType: "PERMANENT" } }),
+
     prisma.resident.create({ data: { householdId: households[6].id, fullName: "Bùi Thanh Sơn", dob: new Date("1986-05-07"), gender: "MALE", idNo: "012345678909", residentType: "PERMANENT" } }),
+    prisma.resident.create({ data: { householdId: households[6].id, fullName: "Bùi Thu Hà", dob: new Date("1988-04-26"), gender: "FEMALE", idNo: "012345678923", residentType: "PERMANENT" } }),
+
     prisma.resident.create({ data: { householdId: households[7].id, fullName: "Phan Đức Long", dob: new Date("1983-03-03"), gender: "MALE", idNo: "012345678910", residentType: "PERMANENT" } }),
+    prisma.resident.create({ data: { householdId: households[7].id, fullName: "Phan Minh Châu", dob: new Date("1987-01-16"), gender: "FEMALE", idNo: "012345678924", residentType: "PERMANENT" } }),
+    prisma.resident.create({ data: { householdId: households[7].id, fullName: "Phan Tuấn Kiệt", dob: new Date("2013-02-05"), gender: "MALE", idNo: "012345678925", residentType: "TEMPORARY" } }),
+
     prisma.resident.create({ data: { householdId: households[8].id, fullName: "Ngô Hải Yến", dob: new Date("1992-10-19"), gender: "FEMALE", idNo: "012345678911", residentType: "PERMANENT" } }),
+    prisma.resident.create({ data: { householdId: households[8].id, fullName: "Ngô Quang Vinh", dob: new Date("1989-07-02"), gender: "MALE", idNo: "012345678926", residentType: "PERMANENT" } }),
+    prisma.resident.create({ data: { householdId: households[8].id, fullName: "Ngô Minh Anh", dob: new Date("2012-03-27"), gender: "FEMALE", idNo: "012345678927", residentType: "PERMANENT" } }),
+    prisma.resident.create({ data: { householdId: households[8].id, fullName: "Ngô Gia Huy", dob: new Date("2018-12-15"), gender: "MALE", idNo: "012345678928", residentType: "PERMANENT" } }),
+
     prisma.resident.create({ data: { householdId: households[9].id, fullName: "Trịnh Tuấn Khang", dob: new Date("1995-01-25"), gender: "MALE", idNo: "012345678912", residentType: "TEMPORARY" } }),
+    ...extraResidentSeeds.map((r) => prisma.resident.create({ data: r })),
   ]);
+
+  const tempResident = residents.find((r) => r.fullName === "Vũ Ngọc Anh") ?? residents[0];
+  const absentResident = residents.find((r) => r.fullName === "Lê Minh Đức") ?? residents[0];
 
   await prisma.residencyEvent.createMany({
     data: [
       {
-        residentId: residents[7].id,
+        residentId: tempResident.id,
         eventType: "TEMP_RESIDENCE",
         fromDate: new Date("2026-03-01"),
         toDate: new Date("2026-08-30"),
@@ -154,40 +229,54 @@ async function main() {
         createdBy: "Lê Văn Dũng",
       },
       {
-        residentId: residents[3].id,
+        residentId: absentResident.id,
         eventType: "TEMP_ABSENCE",
         fromDate: new Date("2026-02-10"),
         toDate: new Date("2026-02-20"),
         note: "Đi công tác",
         createdBy: "Lê Văn Dũng",
       },
+      ...residents.slice(0, 70).map((r, idx) => ({
+        residentId: r.id,
+        eventType: idx % 4 === 0 ? "MOVE_IN" as const : idx % 4 === 1 ? "MOVE_OUT" as const : idx % 4 === 2 ? "TEMP_RESIDENCE" as const : "TEMP_ABSENCE" as const,
+        fromDate: new Date(2024 + (idx % 3), (idx * 2) % 12, 2 + (idx % 20)),
+        toDate: idx % 4 >= 2 ? new Date(2024 + (idx % 3), ((idx * 2) % 12) + 1, 12 + (idx % 10)) : null,
+        note: idx % 2 === 0 ? "Cập nhật biến động theo hồ sơ cư trú" : "Bổ sung trạng thái cư trú",
+        createdBy: idx % 2 === 0 ? "Lê Văn Dũng" : "Nguyễn Thu Hà",
+      })),
     ],
   });
 
-  const service = await prisma.feeType.create({ data: { code: "SERVICE_FEE", name: "Phí dịch vụ", category: "MANDATORY", calcMethod: "PER_M2", rate: 7000, graceDays: 5, lateFeeRule: "0.05%/day", effectiveFrom: new Date("2025-01-01"), effectiveTo: null, policyNote: "Ap dung toan khu", active: true } });
+  const securityService = await prisma.feeType.create({ data: { code: "SECURITY_SERVICE", name: "Phí bảo vệ", category: "MANDATORY", calcMethod: "PER_M2", rate: 2800, graceDays: 5, lateFeeRule: "0.05%/day", effectiveFrom: new Date("2025-01-01"), effectiveTo: null, policyNote: "Ap dung toan khu", active: true } });
+  const sanitationService = await prisma.feeType.create({ data: { code: "SANITATION_SERVICE", name: "Phí vệ sinh", category: "MANDATORY", calcMethod: "PER_M2", rate: 2200, graceDays: 5, lateFeeRule: "0.05%/day", effectiveFrom: new Date("2025-01-01"), effectiveTo: null, policyNote: "Ap dung toan khu", active: true } });
+  const operationService = await prisma.feeType.create({ data: { code: "OPERATION_SERVICE", name: "Phí vận hành", category: "MANDATORY", calcMethod: "PER_M2", rate: 2000, graceDays: 5, lateFeeRule: "0.05%/day", effectiveFrom: new Date("2025-01-01"), effectiveTo: null, policyNote: "Ap dung toan khu", active: true } });
   const management = await prisma.feeType.create({ data: { code: "MANAGEMENT_FEE", name: "Phí quản lý", category: "MANDATORY", calcMethod: "PER_M2", rate: 2500, graceDays: 7, lateFeeRule: "0.03%/day", effectiveFrom: new Date("2025-01-01"), effectiveTo: null, policyNote: "Theo quy che quan ly", active: true } });
   const charity = await prisma.feeType.create({ data: { code: "CHARITY", name: "Quỹ từ thiện", category: "VOLUNTARY", calcMethod: "FIXED", rate: 120000, graceDays: 0, lateFeeRule: "", effectiveFrom: new Date("2025-01-01"), effectiveTo: null, policyNote: "Dong gop tu nguyen", active: true } });
   const seaIsland = await prisma.feeType.create({ data: { code: "SEA_ISLAND", name: "Quỹ biển đảo", category: "VOLUNTARY", calcMethod: "FIXED", rate: 80000, graceDays: 0, lateFeeRule: "", effectiveFrom: new Date("2025-01-01"), effectiveTo: null, policyNote: "Van dong theo dot", active: true } });
 
   const feeTypeById = new Map<number, { calcMethod: "PER_M2" | "FIXED"; rate: number }>([
-    [service.id, { calcMethod: "PER_M2", rate: service.rate }],
+    [securityService.id, { calcMethod: "PER_M2", rate: securityService.rate }],
+    [sanitationService.id, { calcMethod: "PER_M2", rate: sanitationService.rate }],
+    [operationService.id, { calcMethod: "PER_M2", rate: operationService.rate }],
     [management.id, { calcMethod: "PER_M2", rate: management.rate }],
     [charity.id, { calcMethod: "FIXED", rate: charity.rate }],
     [seaIsland.id, { calcMethod: "FIXED", rate: seaIsland.rate }],
   ]);
 
   const periods: Array<{ id: number; feeTypeId: number; month: number; year: number; status: "OPEN" | "CLOSED" }> = [];
-  for (const year of [2025, 2026]) {
-    const monthStart = year === 2025 ? 9 : 1;
-    const monthEnd = year === 2025 ? 12 : 12;
+  for (const year of [2022, 2023, 2024, 2025, 2026]) {
+    const monthStart = 1;
+    const monthEnd = 12;
     for (let month = monthStart; month <= monthEnd; month += 1) {
-      periods.push({
-        id: (await prisma.feePeriod.create({ data: { feeTypeId: service.id, month, year, status: year === 2026 && month >= 10 ? "OPEN" : "CLOSED" } })).id,
-        feeTypeId: service.id,
-        month,
-        year,
-        status: year === 2026 && month >= 10 ? "OPEN" : "CLOSED",
-      });
+      for (const ft of [securityService, sanitationService, operationService]) {
+        periods.push({
+          id: (await prisma.feePeriod.create({ data: { feeTypeId: ft.id, month, year, status: year === 2026 && month >= 10 ? "OPEN" : "CLOSED" } })).id,
+          feeTypeId: ft.id,
+          month,
+          year,
+          status: year === 2026 && month >= 10 ? "OPEN" : "CLOSED",
+        });
+      }
       periods.push({
         id: (await prisma.feePeriod.create({ data: { feeTypeId: management.id, month, year, status: year === 2026 && month >= 10 ? "OPEN" : "CLOSED" } })).id,
         feeTypeId: management.id,
