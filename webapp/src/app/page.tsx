@@ -182,7 +182,7 @@ export default function Home() {
   const [filterFeeMethod, setFilterFeeMethod] = useState<"all" | "PER_M2" | "FIXED">("all");
   const [filterPeriodQuery, setFilterPeriodQuery] = useState("");
   const [filterPeriodQueryDebounced, setFilterPeriodQueryDebounced] = useState("");
-  const [filterPeriodStatus, setFilterPeriodStatus] = useState<"all" | "OPEN" | "CLOSED">("all");
+  const [filterPeriodStatus, setFilterPeriodStatus] = useState<"all" | "OPEN" | "CLOSED">("OPEN");
   const [filterPeriodFeeTypeId, setFilterPeriodFeeTypeId] = useState<number | "all">("all");
   const [filterEventQuery, setFilterEventQuery] = useState("");
   const [filterEventQueryDebounced, setFilterEventQueryDebounced] = useState("");
@@ -615,14 +615,24 @@ export default function Home() {
   }, [obligations, selectedPaymentHouseholdId]);
 
   useEffect(() => {
-    if (!newObligationPeriodId || !newObligationHouseholdId) return;
+    if (!newObligationPeriodId) return;
     const period = periodById.get(newObligationPeriodId);
-    const household = householdById.get(newObligationHouseholdId);
     const feeType = period ? feeTypeByIdMap.get(period.feeTypeId) : null;
-    if (!period || !household || !feeType) return;
-    const amount = feeType.calcMethod === "PER_M2" ? household.areaM2 * feeType.rate : feeType.rate;
-    setNewObligationAmountDue(String(Math.round(amount)));
-  }, [newObligationPeriodId, newObligationHouseholdId, periodById, householdById, feeTypeByIdMap]);
+    if (!period || !feeType) return;
+    if (newObligationForAll) {
+      const total = households.reduce((sum, h) => {
+        const amt = feeType.calcMethod === "PER_M2" ? Math.round(h.areaM2 * feeType.rate) : feeType.rate;
+        return sum + amt;
+      }, 0);
+      setNewObligationAmountDue(String(total));
+    } else {
+      if (!newObligationHouseholdId) return;
+      const household = householdById.get(newObligationHouseholdId);
+      if (!household) return;
+      const amount = feeType.calcMethod === "PER_M2" ? household.areaM2 * feeType.rate : feeType.rate;
+      setNewObligationAmountDue(String(Math.round(amount)));
+    }
+  }, [newObligationPeriodId, newObligationHouseholdId, newObligationForAll, periodById, householdById, feeTypeByIdMap, households]);
 
   const selectedObligationWithMeta = useMemo(() => {
     if (!selectedObligation) return null;
@@ -1239,7 +1249,14 @@ export default function Home() {
       });
     });
 
-    void Promise.all(promises).then(async () => {
+    void Promise.allSettled(promises).then(async (results) => {
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      if (succeeded > 0) {
+        notify("success", l(lang, `Đã tạo ${succeeded}/${promises.length} nghĩa vụ`, `Created ${succeeded}/${promises.length} obligations`));
+      }
+      if (succeeded < promises.length) {
+        notify("error", l(lang, `${promises.length - succeeded} nghĩa vụ không được tạo`, `${promises.length - succeeded} obligations were not created`));
+      }
       await refreshAllFromApi();
       await refreshAuditLogs();
       setNewObligationPeriodId(0);
@@ -1843,7 +1860,7 @@ export default function Home() {
                     <option value={0}>{l(lang, "Chọn căn hộ *", "Select household *")}</option>
                     {households.map((h) => <option key={h.id} value={h.id}>{h.apartmentNo} - {h.ownerName}</option>)}
                   </select>
-                  <div className="flex items-center"><p className="muted">{l(lang, "Số tiền", "Amount")}: <strong>{newObligationAmountDue ? formatVnd(Number(newObligationAmountDue)) : "---"}</strong></p></div>
+                  <div className="flex items-center"><p className="muted">{l(lang, "Số tiền", "Amount")}: <strong>{newObligationAmountDue ? formatVnd(Number(newObligationAmountDue)) : "---"}</strong>{newObligationForAll && newObligationAmountDue ? <span className="muted"> ({l(lang, "Tổng", "Total")})</span> : null}</p></div>
                   <button className="btn-primary" onClick={createObligation}>{l(lang, "Thêm nghĩa vụ", "Add obligation")}</button>
                 </div>
                 <label className="flex items-center gap-2 mt-2" style={{ cursor: "pointer" }}>

@@ -71,6 +71,16 @@ export async function POST(req: NextRequest) {
       data: { amountPaid: obligation.amountPaid + applied },
     });
 
+    const periodObligations = await tx.obligation.findMany({
+      where: { periodId: obligation.periodId },
+    });
+    if (periodObligations.every((o) => o.amountPaid >= o.amountDue)) {
+      await tx.feePeriod.update({
+        where: { id: obligation.periodId },
+        data: { status: "CLOSED" },
+      });
+    }
+
     await tx.auditLog.create({
       data: {
         actorUserId: auth.user!.id,

@@ -71,6 +71,18 @@ export async function DELETE(_: Request, ctx: { params: Promise<{ id: string }> 
         where: { id: obligation.id },
         data: { amountPaid: Math.max(0, obligation.amountPaid - target.paidAmount) },
       });
+      const periodObligations = await tx.obligation.findMany({
+        where: { periodId: obligation.periodId },
+      });
+      if (periodObligations.some((o) => o.amountPaid < o.amountDue)) {
+        const period = await tx.feePeriod.findUnique({ where: { id: obligation.periodId } });
+        if (period && period.status === "CLOSED") {
+          await tx.feePeriod.update({
+            where: { id: obligation.periodId },
+            data: { status: "OPEN" },
+          });
+        }
+      }
     }
   });
 

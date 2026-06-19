@@ -25,6 +25,12 @@ export async function POST(req: NextRequest) {
   if (!Number.isFinite(body.periodId) || !Number.isFinite(body.householdId) || !Number.isFinite(body.amountDue)) {
     return apiError("VALIDATION_ERROR", "Invalid obligation payload", 400);
   }
+  const existing = await db.obligation.findUnique({
+    where: { periodId_householdId: { periodId: body.periodId, householdId: body.householdId } },
+  });
+  if (existing) {
+    return apiError("DUPLICATE_OBLIGATION", "Obligation already exists for this period and household", 409);
+  }
   const row = await db.obligation.create({
     data: {
       periodId: body.periodId,
