@@ -80,6 +80,13 @@ export default function Home() {
   const [attachmentUrl, setAttachmentUrl] = useState("");
   const [reversalNote, setReversalNote] = useState("");
 
+  const [newObligationPeriodId, setNewObligationPeriodId] = useState<number>(0);
+  const [newObligationHouseholdId, setNewObligationHouseholdId] = useState<number>(0);
+  const [newObligationAmountDue, setNewObligationAmountDue] = useState("");
+  const [newObligationForAll, setNewObligationForAll] = useState(false);
+  const [pagePeriods, setPagePeriods] = useState(1);
+  const periodPageSize = 20;
+
   const [newApartmentNo, setNewApartmentNo] = useState("");
   const [newFloorNo, setNewFloorNo] = useState("");
   const [newOwnerName, setNewOwnerName] = useState("");
@@ -498,7 +505,9 @@ export default function Home() {
     if (filterPeriodStatus !== "all" && p.status !== filterPeriodStatus) return false;
     if (filterPeriodFeeTypeId !== "all" && p.feeTypeId !== filterPeriodFeeTypeId) return false;
     return true;
-  }), [periods, feeTypeByIdMap, periodFilterToken, filterPeriodStatus, filterPeriodFeeTypeId]);
+  }).sort((a, b) => b.year - a.year || b.month - a.month), [periods, feeTypeByIdMap, periodFilterToken, filterPeriodStatus, filterPeriodFeeTypeId]);
+  const pagedPeriods = useMemo(() => filteredPeriods.slice((pagePeriods - 1) * periodPageSize, pagePeriods * periodPageSize), [filteredPeriods, pagePeriods]);
+  const totalPeriodPages = Math.max(1, Math.ceil(filteredPeriods.length / periodPageSize));
   const filteredEvents = useMemo(() => events.filter((ev) => {
     const r = residentById.get(ev.residentId);
     const text = `${r?.fullName ?? ""} ${ev.eventType} ${ev.note}`.toLowerCase();
@@ -578,6 +587,10 @@ export default function Home() {
     if (pageCommunications > totalCommunicationPages) setPageCommunications(totalCommunicationPages);
   }, [pageCommunications, totalCommunicationPages]);
 
+  useEffect(() => {
+    if (pagePeriods > totalPeriodPages) setPagePeriods(totalPeriodPages);
+  }, [pagePeriods, totalPeriodPages]);
+
   const selectedObligation = obligations.find((o) => o.id === selectedObligationId);
   const selectablePaymentObligations = useMemo(() => {
     const rows = obligations
@@ -600,6 +613,16 @@ export default function Home() {
       .filter((o) => o.householdId === selectedPaymentHouseholdId)
       .reduce((s, o) => s + Math.max(0, o.amountDue - o.amountPaid), 0);
   }, [obligations, selectedPaymentHouseholdId]);
+
+  useEffect(() => {
+    if (!newObligationPeriodId || !newObligationHouseholdId) return;
+    const period = periodById.get(newObligationPeriodId);
+    const household = householdById.get(newObligationHouseholdId);
+    const feeType = period ? feeTypeByIdMap.get(period.feeTypeId) : null;
+    if (!period || !household || !feeType) return;
+    const amount = feeType.calcMethod === "PER_M2" ? household.areaM2 * feeType.rate : feeType.rate;
+    setNewObligationAmountDue(String(Math.round(amount)));
+  }, [newObligationPeriodId, newObligationHouseholdId, periodById, householdById, feeTypeByIdMap]);
 
   const selectedObligationWithMeta = useMemo(() => {
     if (!selectedObligation) return null;
@@ -689,8 +712,8 @@ export default function Home() {
   }, [tab, paymentView, lang]);
 
   const collectorOptions = useMemo(() => {
-    return Array.from(new Set(payments.map((p) => p.collectorName.trim()).filter((x) => x.length > 0))).sort((a, b) => a.localeCompare(b));
-  }, [payments]);
+    return users.filter((u) => u.role === "ACCOUNTANT").map((u) => u.fullName).filter((x) => x.length > 0).sort((a, b) => a.localeCompare(b));
+  }, [users]);
 
   const payerFilterOptions = useMemo(() => {
     return Array.from(new Set(payments.map((p) => (p.payerName ?? "").trim()).filter((x) => x.length > 0))).sort((a, b) => a.localeCompare(b));
@@ -1193,6 +1216,35 @@ export default function Home() {
     }).then(async () => {
       await refreshAllFromApi();
       await refreshAuditLogs();
+    });
+  }
+
+  function createObligation() {
+    let valid = true;
+    if (!newObligationPeriodId) { setFieldError("newObligationPeriodId", l(lang, "Bắt buộc", "Required")); valid = false; } else clearFieldError("newObligationPeriodId");
+    if (!newObligationHouseholdId && !newObligationForAll) { setFieldError("newObligationHouseholdId", l(lang, "Bắt buộc", "Required")); valid = false; } else clearFieldError("newObligationHouseholdId");
+    if (!valid) return;
+
+    const period = periodById.get(newObligationPeriodId);
+    const feeType = period ? feeTypeByIdMap.get(period.feeTypeId) : null;
+    if (!period || !feeType) return;
+
+    const targets = newObligationForAll ? households : households.filter((h) => h.id === newObligationHouseholdId);
+    const promises = targets.map((h) => {
+      const amount = feeType.calcMethod === "PER_M2" ? Math.round(h.areaM2 * feeType.rate) : feeType.rate;
+      return apiPost(`${API_BASE}/obligations`, {
+        periodId: newObligationPeriodId,
+        householdId: h.id,
+        amountDue: amount,
+      });
+    });
+
+    void Promise.all(promises).then(async () => {
+      await refreshAllFromApi();
+      await refreshAuditLogs();
+      setNewObligationPeriodId(0);
+      setNewObligationHouseholdId(0);
+      setNewObligationAmountDue("");
     });
   }
 
@@ -1744,13 +1796,23 @@ export default function Home() {
                   <button className="btn-secondary" onClick={() => { setFilterPeriodQuery(""); setFilterPeriodStatus("all"); setFilterPeriodFeeTypeId("all"); }}>{l(lang, "Xóa lọc", "Clear filter")}</button>
                 </div>
               </section>
-              <div className="table-wrap mt-3"><table><thead><tr><th>ID</th><th>{t(lang, "name")}</th><th>{t(lang, "month")}</th><th>{t(lang, "year")}</th><th>{t(lang, "status")}</th><th>{l(lang, "Bắt đầu", "Start")}</th><th>{l(lang, "Kết thúc", "End")}</th><th>{l(lang, "Thao tác", "Actions")}</th></tr></thead><tbody>{filteredPeriods.map((p) => <tr key={p.id}><td>{p.id}</td><td>{feeTypeByIdMap.get(p.feeTypeId)?.name}</td><td>{p.month}</td><td>{p.year}</td><td>{p.status}</td><td>{p.startDate ? new Date(p.startDate).toLocaleDateString("vi-VN") : "-"}</td><td>{p.endDate ? new Date(p.endDate).toLocaleDateString("vi-VN") : "-"}</td><td><div className="flex gap-2"><button className="btn-secondary" onClick={() => {
+              <div className="table-wrap mt-3"><table><thead><tr><th>ID</th><th>{t(lang, "name")}</th><th>{t(lang, "month")}</th><th>{t(lang, "year")}</th><th>{t(lang, "status")}</th><th>{l(lang, "Bắt đầu", "Start")}</th><th>{l(lang, "Kết thúc", "End")}</th><th>{l(lang, "Thao tác", "Actions")}</th></tr></thead><tbody>{pagedPeriods.map((p) => <tr key={p.id}><td>{p.id}</td><td>{feeTypeByIdMap.get(p.feeTypeId)?.name}</td><td>{p.month}</td><td>{p.year}</td><td>{p.status}</td><td>{p.startDate ? new Date(p.startDate).toLocaleDateString("vi-VN") : "-"}</td><td>{p.endDate ? new Date(p.endDate).toLocaleDateString("vi-VN") : "-"}</td><td><div className="flex gap-2"><button className="btn-secondary" onClick={() => {
                 setEditingPeriodId(p.id);
                 setNewPeriodFeeTypeId(p.feeTypeId);
                 setNewPeriodMonth(String(p.month));
                 setNewPeriodYear(String(p.year));
                 setNewPeriodStatus(p.status);
               }}>{l(lang, "Sửa", "Edit")}</button><button className="btn-danger" onClick={() => deletePeriod(p.id)}>{l(lang, "Xóa", "Delete")}</button></div></td></tr>)}</tbody></table></div>
+              <div className="flex gap-2 mt-2">
+                <button className="btn-secondary" disabled={pagePeriods <= 1} onClick={() => setPagePeriods((p) => Math.max(1, p - 1))}>{l(lang, "Trước", "Prev")}</button>
+                <button className="btn-secondary" disabled={pagePeriods * periodPageSize >= filteredPeriods.length} onClick={() => setPagePeriods((p) => p + 1)}>{l(lang, "Sau", "Next")}</button>
+                <span className="muted">{l(lang, "Trang", "Page")} {pagePeriods}/{totalPeriodPages}</span>
+                <input className="input" style={{ width: 96 }} type="number" min={1} max={totalPeriodPages} value={pagePeriods} onChange={(e) => {
+                  const next = Number(e.target.value);
+                  if (!Number.isFinite(next)) return;
+                  setPagePeriods(Math.min(totalPeriodPages, Math.max(1, Math.trunc(next))));
+                }} />
+              </div>
             </section>
           )}
 
@@ -1769,6 +1831,28 @@ export default function Home() {
                 )}>i</button>
               </div>
               <p className="muted mt-1">{l(lang, "Các trường có dấu", "Fields marked with")}{" "}<span style={{ color: "#b42318" }}>*</span>{" "}{l(lang, "là bắt buộc", "are required")}</p>
+
+              <section className="card mt-3">
+                <h3 className="subtitle">{l(lang, "Thêm nghĩa vụ thu", "Add tax obligation")}</h3>
+                <div className="grid gap-2 mt-2 md:grid-cols-4">
+                  <select className="input" value={newObligationPeriodId} onChange={(e) => { setNewObligationPeriodId(Number(e.target.value)); clearFieldError("newObligationPeriodId"); }}>
+                    <option value={0}>{l(lang, "Chọn kỳ thu *", "Select period *")}</option>
+                    {periods.filter((p) => p.status === "OPEN").map((p) => <option key={p.id} value={p.id}>{feeTypeByIdMap.get(p.feeTypeId)?.name} - {p.month}/{p.year}</option>)}
+                  </select>
+                  <select className="input" value={newObligationHouseholdId} onChange={(e) => { setNewObligationHouseholdId(Number(e.target.value)); clearFieldError("newObligationHouseholdId"); }} disabled={newObligationForAll}>
+                    <option value={0}>{l(lang, "Chọn căn hộ *", "Select household *")}</option>
+                    {households.map((h) => <option key={h.id} value={h.id}>{h.apartmentNo} - {h.ownerName}</option>)}
+                  </select>
+                  <div className="flex items-center"><p className="muted">{l(lang, "Số tiền", "Amount")}: <strong>{newObligationAmountDue ? formatVnd(Number(newObligationAmountDue)) : "---"}</strong></p></div>
+                  <button className="btn-primary" onClick={createObligation}>{l(lang, "Thêm nghĩa vụ", "Add obligation")}</button>
+                </div>
+                <label className="flex items-center gap-2 mt-2" style={{ cursor: "pointer" }}>
+                  <input type="checkbox" checked={newObligationForAll} onChange={(e) => { setNewObligationForAll(e.target.checked); setNewObligationHouseholdId(0); }} />
+                  <span className="muted">{l(lang, "Áp dụng cho tất cả căn hộ", "Apply to all households")}</span>
+                </label>
+              </section>
+
+              <h3 className="subtitle mt-3">{l(lang, "Ghi nhận thu phí", "Collect payment")}</h3>
               <div className="grid gap-3 md:grid-cols-3 mt-3">
                 <select className="input" value={selectedPaymentHouseholdId} onChange={(e) => setSelectedPaymentHouseholdId(Number(e.target.value))}>
                   {households.map((h) => {

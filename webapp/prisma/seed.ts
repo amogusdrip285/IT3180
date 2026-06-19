@@ -123,55 +123,15 @@ async function main() {
     prisma.household.create({ data: { apartmentNo: "C-2201", floorNo: 22, ownerName: "Lê Minh Đức", ownerPhone: "0903.333.201", emergencyContactName: "Lê Thu Hà", emergencyContactPhone: "0909.300.201", parkingSlots: 1, moveInDate: new Date("2023-01-20"), ownershipStatus: "TENANT", contractEndDate: new Date("2027-01-20"), areaM2: 95, status: "ACTIVE" } }),
     prisma.household.create({ data: { apartmentNo: "A-0906", floorNo: 9, ownerName: "Phạm Hồng Hải", ownerPhone: "0903.444.906", emergencyContactName: "Phạm Huyền", emergencyContactPhone: "0909.400.906", parkingSlots: 0, moveInDate: new Date("2024-03-10"), ownershipStatus: "TENANT", contractEndDate: new Date("2026-12-31"), areaM2: 60, status: "ACTIVE" } }),
     prisma.household.create({ data: { apartmentNo: "B-1102", floorNo: 11, ownerName: "Đào Thị Lan", ownerPhone: "0903.555.102", emergencyContactName: "Đào Quang", emergencyContactPhone: "0909.500.102", parkingSlots: 1, moveInDate: new Date("2020-09-09"), ownershipStatus: "OWNER", contractEndDate: null, areaM2: 74, status: "ACTIVE" } }),
-    prisma.household.create({ data: { apartmentNo: "C-1508", floorNo: 15, ownerName: "Vũ Quốc Bình", ownerPhone: "0903.666.508", emergencyContactName: "Vũ Ngọc Anh", emergencyContactPhone: "0909.600.508", parkingSlots: 2, moveInDate: new Date("2022-11-18"), ownershipStatus: "OWNER", contractEndDate: null, areaM2: 88, status: "ACTIVE" } }),
-    prisma.household.create({ data: { apartmentNo: "A-0702", floorNo: 7, ownerName: "Bùi Thanh Sơn", ownerPhone: "0903.777.702", emergencyContactName: "Bùi Thu Hà", emergencyContactPhone: "0909.700.702", parkingSlots: 1, moveInDate: new Date("2021-08-14"), ownershipStatus: "OWNER", contractEndDate: null, areaM2: 72, status: "ACTIVE" } }),
-    prisma.household.create({ data: { apartmentNo: "B-2004", floorNo: 20, ownerName: "Phan Đức Long", ownerPhone: "0903.888.204", emergencyContactName: "Phan Minh Châu", emergencyContactPhone: "0909.800.204", parkingSlots: 2, moveInDate: new Date("2023-04-22"), ownershipStatus: "TENANT", contractEndDate: new Date("2027-04-22"), areaM2: 91, status: "ACTIVE" } }),
-    prisma.household.create({ data: { apartmentNo: "C-1009", floorNo: 10, ownerName: "Ngô Hải Yến", ownerPhone: "0903.999.109", emergencyContactName: "Ngô Quang Vinh", emergencyContactPhone: "0909.900.109", parkingSlots: 1, moveInDate: new Date("2020-12-06"), ownershipStatus: "OWNER", contractEndDate: null, areaM2: 79, status: "ACTIVE" } }),
-    prisma.household.create({ data: { apartmentNo: "D-0301", floorNo: 3, ownerName: "Trịnh Tuấn Khang", ownerPhone: "0903.101.301", emergencyContactName: "Trịnh Thu An", emergencyContactPhone: "0909.101.301", parkingSlots: 1, moveInDate: new Date("2024-01-05"), ownershipStatus: "TENANT", contractEndDate: new Date("2026-10-01"), areaM2: 64, status: "ACTIVE" } }),
   ]);
 
-  const generatedHouseholds = await Promise.all(
-    Array.from({ length: 20 }, (_, idx) => {
-      const floorNo = 2 + (idx % 25);
-      const apartmentNo = `${String.fromCharCode(68 + (idx % 3))}-${String(floorNo).padStart(2, "0")}${String((idx % 8) + 1).padStart(2, "0")}`;
-      return prisma.household.create({
-        data: {
-          apartmentNo,
-          floorNo,
-          ownerName: `Hộ gia đình ${idx + 11}`,
-          ownerPhone: `0908.${String(200000 + idx).padStart(6, "0")}`,
-          emergencyContactName: `Người thân ${idx + 11}`,
-          emergencyContactPhone: `0911.${String(300000 + idx).padStart(6, "0")}`,
-          parkingSlots: (idx % 3) + 1,
-          moveInDate: new Date(2019 + (idx % 7), idx % 12, (idx % 24) + 1),
-          ownershipStatus: idx % 4 === 0 ? "TENANT" : "OWNER",
-          contractEndDate: idx % 4 === 0 ? new Date(2027, idx % 12, 1) : null,
-          areaM2: 58 + (idx % 9) * 6,
-          status: "ACTIVE",
-        },
-      });
-    }),
-  );
-
-  const households = [...baseHouseholds, ...generatedHouseholds];
+  const households = baseHouseholds;
 
   await prisma.communicationLog.createMany({
     data: households.flatMap((h, idx) => [
       { householdId: h.id, channel: idx % 2 === 0 ? "SMS" : "EMAIL", status: "SENT", sentAt: new Date(2026, 2, 3 + (idx % 10)), note: "Nhắc đóng phí định kỳ" },
       { householdId: h.id, channel: idx % 3 === 0 ? "ZALO" : "NOTICE", status: idx % 4 === 0 ? "FAILED" : "SENT", sentAt: new Date(2026, 3, 8 + (idx % 10)), note: idx % 4 === 0 ? "Không gửi được, cần gọi trực tiếp" : "Thông báo công nợ tháng mới" },
     ]),
-  });
-
-  const extraResidentSeeds = generatedHouseholds.flatMap((h, idx) => {
-    const count = (idx % 4) + 1;
-    return Array.from({ length: count }, (_, n) => ({
-      householdId: h.id,
-      fullName: `Thành viên ${idx + 11}-${n + 1}`,
-      dob: new Date(1978 + ((idx + n) % 35), (idx + n) % 12, ((idx + n) % 26) + 1),
-      gender: (n % 3 === 0 ? "MALE" : n % 3 === 1 ? "FEMALE" : "OTHER") as "MALE" | "FEMALE" | "OTHER",
-      idNo: `099${String(100000000 + idx * 10 + n)}`,
-      residentType: (n <= 1 ? "PERMANENT" : "TEMPORARY") as "PERMANENT" | "TEMPORARY",
-    }));
   });
 
   const residents = await Promise.all([
@@ -193,26 +153,6 @@ async function main() {
     prisma.resident.create({ data: { householdId: households[4].id, fullName: "Đào Thị Lan", dob: new Date("1991-09-29"), gender: "FEMALE", idNo: "012345678906", residentType: "PERMANENT" } }),
     prisma.resident.create({ data: { householdId: households[4].id, fullName: "Đào Quang", dob: new Date("1989-11-30"), gender: "MALE", idNo: "012345678919", residentType: "PERMANENT" } }),
     prisma.resident.create({ data: { householdId: households[4].id, fullName: "Đào Mai Chi", dob: new Date("2016-09-12"), gender: "FEMALE", idNo: "012345678920", residentType: "PERMANENT" } }),
-
-    prisma.resident.create({ data: { householdId: households[5].id, fullName: "Vũ Quốc Bình", dob: new Date("1988-07-05"), gender: "MALE", idNo: "012345678907", residentType: "PERMANENT" } }),
-    prisma.resident.create({ data: { householdId: households[5].id, fullName: "Vũ Ngọc Anh", dob: new Date("2001-11-18"), gender: "FEMALE", idNo: "012345678908", residentType: "TEMPORARY" } }),
-    prisma.resident.create({ data: { householdId: households[5].id, fullName: "Vũ Hoàng Nam", dob: new Date("2010-05-17"), gender: "MALE", idNo: "012345678921", residentType: "PERMANENT" } }),
-    prisma.resident.create({ data: { householdId: households[5].id, fullName: "Vũ Thảo Vy", dob: new Date("2019-06-21"), gender: "FEMALE", idNo: "012345678922", residentType: "PERMANENT" } }),
-
-    prisma.resident.create({ data: { householdId: households[6].id, fullName: "Bùi Thanh Sơn", dob: new Date("1986-05-07"), gender: "MALE", idNo: "012345678909", residentType: "PERMANENT" } }),
-    prisma.resident.create({ data: { householdId: households[6].id, fullName: "Bùi Thu Hà", dob: new Date("1988-04-26"), gender: "FEMALE", idNo: "012345678923", residentType: "PERMANENT" } }),
-
-    prisma.resident.create({ data: { householdId: households[7].id, fullName: "Phan Đức Long", dob: new Date("1983-03-03"), gender: "MALE", idNo: "012345678910", residentType: "PERMANENT" } }),
-    prisma.resident.create({ data: { householdId: households[7].id, fullName: "Phan Minh Châu", dob: new Date("1987-01-16"), gender: "FEMALE", idNo: "012345678924", residentType: "PERMANENT" } }),
-    prisma.resident.create({ data: { householdId: households[7].id, fullName: "Phan Tuấn Kiệt", dob: new Date("2013-02-05"), gender: "MALE", idNo: "012345678925", residentType: "TEMPORARY" } }),
-
-    prisma.resident.create({ data: { householdId: households[8].id, fullName: "Ngô Hải Yến", dob: new Date("1992-10-19"), gender: "FEMALE", idNo: "012345678911", residentType: "PERMANENT" } }),
-    prisma.resident.create({ data: { householdId: households[8].id, fullName: "Ngô Quang Vinh", dob: new Date("1989-07-02"), gender: "MALE", idNo: "012345678926", residentType: "PERMANENT" } }),
-    prisma.resident.create({ data: { householdId: households[8].id, fullName: "Ngô Minh Anh", dob: new Date("2012-03-27"), gender: "FEMALE", idNo: "012345678927", residentType: "PERMANENT" } }),
-    prisma.resident.create({ data: { householdId: households[8].id, fullName: "Ngô Gia Huy", dob: new Date("2018-12-15"), gender: "MALE", idNo: "012345678928", residentType: "PERMANENT" } }),
-
-    prisma.resident.create({ data: { householdId: households[9].id, fullName: "Trịnh Tuấn Khang", dob: new Date("1995-01-25"), gender: "MALE", idNo: "012345678912", residentType: "TEMPORARY" } }),
-    ...extraResidentSeeds.map((r) => prisma.resident.create({ data: r })),
   ]);
 
   const tempResident = residents.find((r) => r.fullName === "Vũ Ngọc Anh") ?? residents[0];
@@ -236,7 +176,7 @@ async function main() {
         note: "Đi công tác",
         createdBy: "Lê Văn Dũng",
       },
-      ...residents.slice(0, 70).map((r, idx) => ({
+      ...residents.slice(0, 15).map((r, idx) => ({
         residentId: r.id,
         eventType: idx % 4 === 0 ? "MOVE_IN" as const : idx % 4 === 1 ? "MOVE_OUT" as const : idx % 4 === 2 ? "TEMP_RESIDENCE" as const : "TEMP_ABSENCE" as const,
         fromDate: new Date(2024 + (idx % 3), (idx * 2) % 12, 2 + (idx % 20)),
