@@ -25,7 +25,7 @@ export function toSafeNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function parsePagination(params: URLSearchParams, defaultPageSize = 200, maxPageSize = 500) {
+export function parsePagination(params: URLSearchParams, defaultPageSize = 200, maxPageSize = 10000) {
   const pageRaw = Number(params.get("page") ?? 1);
   const pageSizeRaw = Number(params.get("pageSize") ?? defaultPageSize);
   const page = Number.isInteger(pageRaw) && pageRaw > 0 ? pageRaw : 1;

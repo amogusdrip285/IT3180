@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAuth, requirePermission } from "@/lib/auth";
-import { writeAudit } from "@/lib/audit";
 import { apiError } from "@/lib/errors";
 import { parsePagination } from "@/lib/validation";
 
@@ -92,14 +91,6 @@ export async function POST(req: NextRequest) {
     });
 
     return payment;
-  });
-
-  await writeAudit({
-    actorUserId: auth.user!.id,
-    action: "COLLECT_PAYMENT",
-    entity: "PAYMENT",
-    entityId: String(result.id),
-    detail: `Collected payment ${result.receiptNo}`,
   });
 
   return NextResponse.json(result);

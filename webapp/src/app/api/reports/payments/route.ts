@@ -27,6 +27,11 @@ export async function GET(req: NextRequest) {
 
   const rows = await db.payment.findMany({
     orderBy: { paidAt: "desc" },
+    where: {
+      ...(month ? { obligation: { period: { month } } } : {}),
+      ...(year ? { obligation: { period: { year } } } : {}),
+      ...(categoryParam && categoryParam !== "all" ? { feeType: { category: categoryParam as "MANDATORY" | "VOLUNTARY" } } : {}),
+    },
     include: {
       feeType: true,
       obligation: {
@@ -38,13 +43,7 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  const filtered = rows.filter((p) => {
-    const period = p.obligation.period;
-    if (month && period.month !== month) return false;
-    if (year && period.year !== year) return false;
-    if (categoryParam && categoryParam !== "all" && p.feeType.category !== categoryParam) return false;
-    return true;
-  });
+  const filtered = rows;
 
   const headers = [
     "payment_id",

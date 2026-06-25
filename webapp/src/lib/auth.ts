@@ -24,16 +24,29 @@ export async function getAuthUser(): Promise<AuthUser | null> {
   const now = new Date();
   const session = await db.session.findUnique({
     where: { token },
-    include: {
+    select: {
+      id: true,
+      revokedAt: true,
+      expiresAt: true,
       user: {
-        include: {
+        select: {
+          id: true,
+          username: true,
+          fullName: true,
+          avatarUrl: true,
+          address: true,
+          role: true,
+          status: true,
           userRoles: {
-            include: {
+            select: {
               role: {
-                include: {
+                select: {
+                  code: true,
                   permissions: {
-                    include: {
-                      permission: true,
+                    select: {
+                      permission: {
+                        select: { code: true },
+                      },
                     },
                   },
                 },

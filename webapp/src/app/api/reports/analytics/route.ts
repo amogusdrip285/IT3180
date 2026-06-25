@@ -15,11 +15,17 @@ export async function GET() {
   if (deny) return deny;
 
   const [obligations, payments, feeTypes, households] = await Promise.all([
-    db.obligation.findMany({ include: { period: true, household: true } }),
-    db.payment.findMany({ include: { feeType: true, obligation: { include: { household: true, period: true } } } }),
-    db.feeType.findMany(),
-    db.household.findMany(),
+    db.obligation.findMany({
+      select: { id: true, amountDue: true, amountPaid: true, householdId: true, period: { select: { month: true, year: true } } },
+    }),
+    db.payment.findMany({
+      select: { id: true, paidAmount: true, feeTypeId: true, collectorName: true, obligation: { select: { householdId: true, period: { select: { month: true, year: true } } } } },
+    }),
+    db.feeType.findMany({ select: { id: true, category: true } }),
+    db.household.findMany({ select: { id: true, floorNo: true } }),
   ]);
+
+  const householdFloorMap = new Map(households.map((h) => [h.id, h.floorNo]));
 
   const now = new Date();
   const aging: AgingBucket[] = [
@@ -29,9 +35,13 @@ export async function GET() {
     { label: "90+", count: 0, amount: 0 },
   ];
 
+  const collectionByMonthMap = new Map<string, { due: number; paid: number }>();
+  const byFloorMap = new Map<number, { due: number; paid: number }>();
+
   for (const o of obligations) {
     const remaining = Math.max(0, o.amountDue - o.amountPaid);
     if (remaining <= 0) continue;
+
     const dueDate = new Date(o.period.year, o.period.month, 0);
     const days = Math.max(0, diffDays(dueDate, now));
     let idx = 3;
@@ -40,15 +50,18 @@ export async function GET() {
     else if (days <= 90) idx = 2;
     aging[idx].count += 1;
     aging[idx].amount += remaining;
-  }
 
-  const collectionByMonthMap = new Map<string, { due: number; paid: number }>();
-  for (const o of obligations) {
     const key = `${o.period.year}-${String(o.period.month).padStart(2, "0")}`;
     const current = collectionByMonthMap.get(key) ?? { due: 0, paid: 0 };
     current.due += o.amountDue;
     current.paid += o.amountPaid;
     collectionByMonthMap.set(key, current);
+
+    const floor = householdFloorMap.get(o.householdId) ?? 0;
+    const floorEntry = byFloorMap.get(floor) ?? { due: 0, paid: 0 };
+    floorEntry.due += o.amountDue;
+    floorEntry.paid += o.amountPaid;
+    byFloorMap.set(floor, floorEntry);
   }
 
   const collectionByMonth = Array.from(collectionByMonthMap.entries())
@@ -68,26 +81,19 @@ export async function GET() {
     .map(([collector, amount]) => ({ collector, amount }))
     .sort((a, b) => b.amount - a.amount);
 
-  const byFloorMap = new Map<number, { due: number; paid: number }>();
-  for (const o of obligations) {
-    const floor = o.household.floorNo;
-    const current = byFloorMap.get(floor) ?? { due: 0, paid: 0 };
-    current.due += o.amountDue;
-    current.paid += o.amountPaid;
-    byFloorMap.set(floor, current);
-  }
   const byFloor = Array.from(byFloorMap.entries())
     .map(([floor, v]) => ({ floor, due: v.due, paid: v.paid, rate: v.due > 0 ? Number(((v.paid / v.due) * 100).toFixed(1)) : 0 }))
     .sort((a, b) => a.floor - b.floor);
 
-  const voluntaryFees = feeTypes.filter((f) => f.category === "VOLUNTARY").map((f) => f.id);
-  const voluntaryPayments = payments.filter((p) => voluntaryFees.includes(p.feeTypeId));
+  const voluntaryFees = new Set(feeTypes.filter((f) => f.category === "VOLUNTARY").map((f) => f.id));
+  const voluntaryPayments = payments.filter((p) => voluntaryFees.has(p.feeTypeId));
   const payingHouseholds = new Set(voluntaryPayments.map((p) => p.obligation.householdId));
   const voluntaryTotal = voluntaryPayments.reduce((sum, p) => sum + p.paidAmount, 0);
+  const totalHouseholds = households.length;
   const voluntaryStats = {
     participatingHouseholds: payingHouseholds.size,
-    totalHouseholds: households.length,
-    participationRate: households.length > 0 ? Number(((payingHouseholds.size / households.length) * 100).toFixed(1)) : 0,
+    totalHouseholds,
+    participationRate: totalHouseholds > 0 ? Number(((payingHouseholds.size / totalHouseholds) * 100).toFixed(1)) : 0,
     totalAmount: voluntaryTotal,
     averageContribution: payingHouseholds.size > 0 ? Math.round(voluntaryTotal / payingHouseholds.size) : 0,
   };

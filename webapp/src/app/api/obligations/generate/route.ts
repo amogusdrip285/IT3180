@@ -15,20 +15,28 @@ export async function POST() {
   });
   const households = await db.household.findMany();
 
-  let created = 0;
+  const existingKeys = await db.obligation.findMany({
+    where: { periodId: { in: openPeriods.map((p) => p.id) } },
+    select: { periodId: true, householdId: true },
+  });
+  const existingSet = new Set(existingKeys.map((k) => `${k.periodId}-${k.householdId}`));
+
+  const data: Array<{ periodId: number; householdId: number; amountDue: number; amountPaid: number }> = [];
   for (const p of openPeriods) {
     for (const h of households) {
-      const existing = await db.obligation.findUnique({
-        where: { periodId_householdId: { periodId: p.id, householdId: h.id } },
-      });
-      if (existing) continue;
+      const key = `${p.id}-${h.id}`;
+      if (existingSet.has(key)) continue;
       const due = p.feeType.calcMethod === "PER_M2" ? h.areaM2 * p.feeType.rate : p.feeType.rate;
-      await db.obligation.create({
-        data: { periodId: p.id, householdId: h.id, amountDue: due, amountPaid: 0 },
-      });
-      created += 1;
+      data.push({ periodId: p.id, householdId: h.id, amountDue: due, amountPaid: 0 });
     }
   }
+
+  if (data.length === 0) {
+    return NextResponse.json({ ok: true, created: 0 });
+  }
+
+  await db.obligation.createMany({ data });
+  const created = data.length;
 
   await writeAudit({
     actorUserId: auth.user!.id,

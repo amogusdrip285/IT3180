@@ -179,6 +179,8 @@ model Resident {
   household    Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
   events       ResidencyEvent[]
   createdAt    DateTime     @default(now())
+
+  @@index([householdId])
 }
 
 model ResidencyEvent {
@@ -219,6 +221,10 @@ model FeePeriod {
   endDate   DateTime?
   feeType   FeeType      @relation(fields: [feeTypeId], references: [id], onDelete: Cascade)
   obligations Obligation[]
+
+  @@index([feeTypeId])
+  @@index([status])
+  @@index([year, month])
 }
 
 model Obligation {
@@ -232,6 +238,8 @@ model Obligation {
   payments    Payment[]
 
   @@unique([periodId, householdId])
+  @@index([householdId])
+  @@index([periodId])
 }
 
 model Payment {
@@ -251,6 +259,11 @@ model Payment {
   note         String
   obligation   Obligation    @relation(fields: [obligationId], references: [id], onDelete: Cascade)
   feeType      FeeType       @relation(fields: [feeTypeId], references: [id], onDelete: Cascade)
+
+  @@index([obligationId])
+  @@index([feeTypeId])
+  @@index([paidAt])
+  @@index([method])
 }
 
 model CommunicationLog {
@@ -282,4 +295,7 @@ model AuditLog {
   detail    String
   createdAt DateTime    @default(now())
   actor     User        @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  @@index([actorUserId])
+  @@index([action])
 }

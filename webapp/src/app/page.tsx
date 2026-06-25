@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useDebounce } from "@/lib/use-debounce";
 import { BarChart } from "@/components/BarChart";
 import { AccountPanel } from "@/components/AccountPanel";
 import { AuthCard } from "@/components/AuthCard";
@@ -24,6 +25,10 @@ function l(lang: Lang, vi: string, en: string): string {
   return lang === "vi" ? vi : en;
 }
 
+function getEmptyStats() {
+  return { totalDue: 0, totalPaid: 0, outstanding: 0, paidHouseholds: 0 };
+}
+
 export default function Home() {
   const [theme, setTheme] = useState<"blue" | "green" | "pink" | "red" | "yellow">("blue");
   const [lang, setLang] = useState<Lang>("vi");
@@ -39,7 +44,6 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState("");
   const [globalSearch, setGlobalSearch] = useState("");
-  const [globalSearchDebounced, setGlobalSearchDebounced] = useState("");
 
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<AppRole[]>([]);
@@ -173,23 +177,18 @@ export default function Home() {
   const [filterResidentType, setFilterResidentType] = useState<"all" | "PERMANENT" | "TEMPORARY">("all");
   const [filterResidentFloor, setFilterResidentFloor] = useState<number | "all">("all");
   const [filterHouseholdQuery, setFilterHouseholdQuery] = useState("");
-  const [filterHouseholdQueryDebounced, setFilterHouseholdQueryDebounced] = useState("");
   const [filterHouseholdOwnership, setFilterHouseholdOwnership] = useState<"all" | "OWNER" | "TENANT">("all");
   const [filterHouseholdFloor, setFilterHouseholdFloor] = useState<number | "all">("all");
   const [filterFeeQuery, setFilterFeeQuery] = useState("");
-  const [filterFeeQueryDebounced, setFilterFeeQueryDebounced] = useState("");
   const [filterFeeCategory, setFilterFeeCategory] = useState<"all" | "MANDATORY" | "VOLUNTARY">("all");
   const [filterFeeMethod, setFilterFeeMethod] = useState<"all" | "PER_M2" | "FIXED">("all");
   const [filterPeriodQuery, setFilterPeriodQuery] = useState("");
-  const [filterPeriodQueryDebounced, setFilterPeriodQueryDebounced] = useState("");
   const [filterPeriodStatus, setFilterPeriodStatus] = useState<"all" | "OPEN" | "CLOSED">("OPEN");
   const [filterPeriodFeeTypeId, setFilterPeriodFeeTypeId] = useState<number | "all">("all");
   const [filterEventQuery, setFilterEventQuery] = useState("");
-  const [filterEventQueryDebounced, setFilterEventQueryDebounced] = useState("");
   const [filterEventType, setFilterEventType] = useState<"all" | "TEMP_RESIDENCE" | "TEMP_ABSENCE" | "MOVE_IN" | "MOVE_OUT">("all");
   const [filterEventResidentId, setFilterEventResidentId] = useState<number | "all">("all");
   const [filterUserQuery, setFilterUserQuery] = useState("");
-  const [filterUserQueryDebounced, setFilterUserQueryDebounced] = useState("");
   const [filterUserRole, setFilterUserRole] = useState<"all" | "ADMIN" | "ACCOUNTANT" | "TEAM_LEADER">("all");
   const [filterUserStatus, setFilterUserStatus] = useState<"all" | "ACTIVE" | "BLOCKED">("all");
   const [inspectHouseholdSearch, setInspectHouseholdSearch] = useState("");
@@ -216,7 +215,7 @@ export default function Home() {
     note: true,
   });
 
-  const labels: Record<Tab, string> = {
+  const labels = useMemo<Record<Tab, string>>(() => ({
     dashboard: t(lang, "dashboard"),
     fees: t(lang, "feeTypes"),
     periods: t(lang, "periods"),
@@ -228,33 +227,33 @@ export default function Home() {
     reports: t(lang, "reports"),
     account: l(lang, "Tài khoản", "Account"),
     handbook: l(lang, "Hướng dẫn", "Handbook"),
-  };
+  }), [lang]);
 
-  function notify(type: "success" | "error", message: string) {
+  const notify = useCallback((type: "success" | "error", message: string) => {
     setToast({ type, message });
     setTimeout(() => setToast(null), 3000);
-  }
+  }, []);
 
-  function showGuide(title: string, lines: string[]) {
+  const showGuide = useCallback((title: string, lines: string[]) => {
     setHelpModal({ open: true, title, lines });
-  }
+  }, []);
 
-  function setFieldError(key: string, message: string) {
+  const setFieldError = useCallback((key: string, message: string) => {
     setFieldErrors((prev) => ({ ...prev, [key]: message }));
-  }
+  }, []);
 
-  function clearFieldError(key: string) {
+  const clearFieldError = useCallback((key: string) => {
     setFieldErrors((prev) => {
       if (!prev[key]) return prev;
       const next = { ...prev };
       delete next[key];
       return next;
     });
-  }
+  }, []);
 
-  const isAnyBusy = Object.values(busy).some(Boolean);
+  const isAnyBusy = useMemo(() => Object.values(busy).some(Boolean), [busy]);
 
-  async function runAction(key: string, action: () => Promise<void>, successMsg: string, fallbackErr: string) {
+  const runAction = useCallback(async (key: string, action: () => Promise<void>, successMsg: string, fallbackErr: string) => {
     setBusy((p) => ({ ...p, [key]: true }));
     try {
       await action();
@@ -265,7 +264,7 @@ export default function Home() {
     } finally {
       setBusy((p) => ({ ...p, [key]: false }));
     }
-  }
+  }, [notify]);
 
   const visibleTabs = useMemo(() => {
     if (!user) return ["handbook"] as Tab[];
@@ -278,18 +277,9 @@ export default function Home() {
     return tabs;
   }, [user]);
 
-  async function apiGetAllPages<T>(url: string, pageSize = 500): Promise<T[]> {
-    const all: T[] = [];
-    let page = 1;
-    while (true) {
-      const sep = url.includes("?") ? "&" : "?";
-      const chunk = await apiGet<T[]>(`${url}${sep}page=${page}&pageSize=${pageSize}`);
-      all.push(...chunk);
-      if (chunk.length < pageSize) break;
-      page += 1;
-      if (page > 200) break;
-    }
-    return all;
+  async function apiGetAllPages<T>(url: string): Promise<T[]> {
+    const sep = url.includes("?") ? "&" : "?";
+    return apiGet<T[]>(`${url}${sep}page=1&pageSize=10000`);
   }
 
   const refreshAllFromApi = useCallback(async () => {
@@ -305,7 +295,7 @@ export default function Home() {
         apiGetAllPages<Obligation>(`${API_BASE}/obligations`),
         apiGetAllPages<Payment>(`${API_BASE}/payments`),
         apiGetAllPages<ResidencyEvent>(`${API_BASE}/residency-events`),
-        apiGetAllPages<CommunicationLog & { household?: Household }>(`${API_BASE}/communication-logs`, 200),
+        apiGetAllPages<CommunicationLog & { household?: Household }>(`${API_BASE}/communication-logs`),
         apiGet<{ aging: Array<{ label: string; count: number; amount: number }>; collectionByMonth: Array<{ label: string; due: number; paid: number; rate: number }>; byCollector: Array<{ collector: string; amount: number }>; byFloor: Array<{ floor: number; due: number; paid: number; rate: number }>; voluntaryStats: { participatingHouseholds: number; totalHouseholds: number; participationRate: number; totalAmount: number; averageContribution: number } }>(`${API_BASE}/reports/analytics`),
         apiGet<AppRole[]>(`${API_BASE}/roles`).catch(() => []),
         apiGet<PermissionItem[]>(`${API_BASE}/permissions`).catch(() => []),
@@ -331,11 +321,11 @@ export default function Home() {
       setSelectedRoleId((prev) => (prev || roleRows[0]?.id || 0));
       setSelectedUserIdForRoles((prev) => (prev || u[0]?.id || 0));
     } catch {
-      setErrorText(l(lang, "Không thể tải dữ liệu", "Cannot load data"));
+      setErrorText("Cannot load data");
     } finally {
       setLoading(false);
     }
-  }, [lang]);
+  }, []);
 
   const refreshAuditLogs = useCallback(async () => {
     try {
@@ -367,42 +357,12 @@ export default function Home() {
     document.body.classList.add(`theme-${theme}`);
   }, [theme]);
 
-  useEffect(() => {
-    const t = setTimeout(() => setGlobalSearchDebounced(globalSearch), 180);
-    return () => clearTimeout(t);
-  }, [globalSearch]);
-
-  useEffect(() => {
-    const t = setTimeout(() => setFilterHouseholdQueryDebounced(filterHouseholdQuery), 180);
-    return () => clearTimeout(t);
-  }, [filterHouseholdQuery]);
-
-  useEffect(() => {
-    const t = setTimeout(() => setFilterFeeQueryDebounced(filterFeeQuery), 180);
-    return () => clearTimeout(t);
-  }, [filterFeeQuery]);
-
-  useEffect(() => {
-    const t = setTimeout(() => setFilterPeriodQueryDebounced(filterPeriodQuery), 180);
-    return () => clearTimeout(t);
-  }, [filterPeriodQuery]);
-
-  useEffect(() => {
-    const t = setTimeout(() => setFilterEventQueryDebounced(filterEventQuery), 180);
-    return () => clearTimeout(t);
-  }, [filterEventQuery]);
-
-  useEffect(() => {
-    const t = setTimeout(() => setFilterUserQueryDebounced(filterUserQuery), 180);
-    return () => clearTimeout(t);
-  }, [filterUserQuery]);
-
-  const searchToken = globalSearchDebounced.trim().toLowerCase();
-  const householdFilterToken = filterHouseholdQueryDebounced.trim().toLowerCase();
-  const feeFilterToken = filterFeeQueryDebounced.trim().toLowerCase();
-  const periodFilterToken = filterPeriodQueryDebounced.trim().toLowerCase();
-  const eventFilterToken = filterEventQueryDebounced.trim().toLowerCase();
-  const userFilterToken = filterUserQueryDebounced.trim().toLowerCase();
+  const searchToken = useDebounce(globalSearch, 180).trim().toLowerCase();
+  const householdFilterToken = useDebounce(filterHouseholdQuery, 180).trim().toLowerCase();
+  const feeFilterToken = useDebounce(filterFeeQuery, 180).trim().toLowerCase();
+  const periodFilterToken = useDebounce(filterPeriodQuery, 180).trim().toLowerCase();
+  const eventFilterToken = useDebounce(filterEventQuery, 180).trim().toLowerCase();
+  const userFilterToken = useDebounce(filterUserQuery, 180).trim().toLowerCase();
   const householdById = useMemo(() => new Map(households.map((h) => [h.id, h] as const)), [households]);
   const residentById = useMemo(() => new Map(residents.map((r) => [r.id, r] as const)), [residents]);
   const obligationById = useMemo(() => new Map(obligations.map((o) => [o.id, o] as const)), [obligations]);
@@ -554,6 +514,10 @@ export default function Home() {
   const pagedPaymentsTab = useMemo(() => paymentView.slice((pagePaymentsTab - 1) * paymentTimelinePageSize, pagePaymentsTab * paymentTimelinePageSize), [paymentView, pagePaymentsTab]);
 
 
+  const floorOptions = useMemo(() =>
+    Array.from(new Set(households.map((h) => h.floorNo))).sort((a, b) => a - b),
+  [households]);
+
   const totalHouseholdPages = Math.max(1, Math.ceil(filteredHouseholds.length / pageSize));
   const totalResidentPages = Math.max(1, Math.ceil(filteredResidents.length / pageSize));
   const totalEventPages = Math.max(1, Math.ceil(filteredEvents.length / pageSize));
@@ -655,7 +619,7 @@ export default function Home() {
 
   const stats = useMemo(() => {
     if (tab !== "dashboard") {
-      return { totalDue: 0, totalPaid: 0, outstanding: 0, paidHouseholds: 0 };
+      return getEmptyStats();
     }
     const totalDue = obligations.reduce((s, o) => s + o.amountDue, 0);
     const totalPaid = obligations.reduce((s, o) => s + o.amountPaid, 0);
@@ -1051,15 +1015,18 @@ export default function Home() {
     if (selectedFeeTypeIds.length === 0) return;
     if (!window.confirm(l(lang, `Xóa ${selectedFeeTypeIds.length} khoản phí đã chọn?`, `Delete ${selectedFeeTypeIds.length} selected fee types?`))) return;
 
-    const failed: number[] = [];
-    for (const id of selectedFeeTypeIds) {
-      const res = await fetch(`${API_BASE}/fee-types/${id}`, { method: "DELETE" });
-      if (!res.ok) failed.push(id);
-    }
+    const results = await Promise.allSettled(
+      selectedFeeTypeIds.map((id) =>
+        fetch(`${API_BASE}/fee-types/${id}`, { method: "DELETE" }).then((r) => {
+          if (!r.ok) throw new Error();
+        }),
+      ),
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
     setSelectedFeeTypeIds([]);
     await refreshAllFromApi();
-    if (failed.length > 0) {
-      notify("error", l(lang, `Không thể xóa ${failed.length} khoản phí do đã phát sinh kỳ thu/giao dịch`, `Failed to delete ${failed.length} fee types due to related periods/payments`));
+    if (failed > 0) {
+      notify("error", l(lang, `Không thể xóa ${failed} khoản phí do đã phát sinh kỳ thu/giao dịch`, `Failed to delete ${failed} fee types due to related periods/payments`));
     } else {
       notify("success", l(lang, "Đã xóa hàng loạt khoản phí", "Bulk fee delete completed"));
     }
@@ -1126,15 +1093,18 @@ export default function Home() {
     if (selectedResidentIds.length === 0) return;
     if (!window.confirm(l(lang, `Xóa ${selectedResidentIds.length} nhân khẩu đã chọn?`, `Delete ${selectedResidentIds.length} selected residents?`))) return;
 
-    const failed: number[] = [];
-    for (const id of selectedResidentIds) {
-      const res = await fetch(`${API_BASE}/residents/${id}`, { method: "DELETE" });
-      if (!res.ok) failed.push(id);
-    }
+    const results = await Promise.allSettled(
+      selectedResidentIds.map((id) =>
+        fetch(`${API_BASE}/residents/${id}`, { method: "DELETE" }).then((r) => {
+          if (!r.ok) throw new Error();
+        }),
+      ),
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
     setSelectedResidentIds([]);
     await refreshAllFromApi();
-    if (failed.length > 0) {
-      notify("error", l(lang, `Không thể xóa ${failed.length} nhân khẩu do ràng buộc dữ liệu`, `Failed to delete ${failed.length} residents due to dependencies`));
+    if (failed > 0) {
+      notify("error", l(lang, `Không thể xóa ${failed} nhân khẩu do ràng buộc dữ liệu`, `Failed to delete ${failed} residents due to dependencies`));
     } else {
       notify("success", l(lang, "Đã xóa hàng loạt nhân khẩu", "Bulk resident delete completed"));
     }
@@ -1432,13 +1402,28 @@ export default function Home() {
   return (
     <main className="page-shell">
       <header className="header-band">
-        <div>
-          <p className="eyebrow">{t(lang, "projectName")}</p>
-          <h1 className="title">{t(lang, "appTitle")}</h1>
-          <p className="muted">{l(lang, "Bản mở rộng cho đồ án: dữ liệu sâu + analytics + UX", "School-project expansion: richer data + analytics + UX")}</p>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <span style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            background: "linear-gradient(135deg, var(--brand), #1a7aee)",
+            color: "#fff",
+            fontSize: "0.85rem",
+            fontWeight: 700,
+            letterSpacing: "-0.02em",
+            flexShrink: 0,
+          }}>BM</span>
+          <div>
+            <p className="eyebrow" style={{ margin: 0, fontSize: "0.68rem" }}>{t(lang, "projectName")}</p>
+            <h1 className="title" style={{ fontSize: "1.2rem" }}>{t(lang, "appTitle")}</h1>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <select className="input" value={theme} onChange={(e) => setTheme(e.target.value as "blue" | "green" | "pink" | "red" | "yellow")} style={{ width: 130 }}>
+        <div className="flex items-center gap-2">
+          <select className="input" value={theme} onChange={(e) => setTheme(e.target.value as "blue" | "green" | "pink" | "red" | "yellow")} style={{ width: 120, padding: "0.45rem 0.6rem", fontSize: "0.82rem" }}>
             <option value="blue">Blue</option>
             <option value="green">Green</option>
             <option value="pink">Pink</option>
@@ -1446,7 +1431,7 @@ export default function Home() {
             <option value="yellow">Yellow</option>
           </select>
           <LanguageSwitch lang={lang} onChange={setLang} label={t(lang, "language")} />
-          <button className="btn-ghost" onClick={logout}>{t(lang, "logout")} ({user.username})</button>
+          <button className="btn-ghost" onClick={logout} style={{ padding: "0.45rem 0.65rem", fontSize: "0.82rem" }}>{t(lang, "logout")} ({user.username})</button>
         </div>
       </header>
 
@@ -1460,30 +1445,30 @@ export default function Home() {
             </section>
           )}
 
-          <section className="card">
-            {isAnyBusy && <p className="muted mb-2">{l(lang, "Đang xử lý thao tác...", "Processing action...")}</p>}
-            <div className="grid gap-2 md:grid-cols-3 items-end">
+          <section className="card" style={{ padding: "0.9rem 1rem" }}>
+            {isAnyBusy && <p className="muted" style={{ marginBottom: "0.5rem", fontSize: "0.82rem" }}>{l(lang, "Đang xử lý thao tác...", "Processing action...")}</p>}
+            <div style={{ display: "grid", gap: "0.6rem", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", alignItems: "end" }}>
               <div>
-                <label className="label">{l(lang, "Tìm kiếm toàn cục", "Global search")}</label>
+                <label className="label" style={{ fontSize: "0.78rem" }}>{l(lang, "Tìm kiếm toàn cục", "Global search")}</label>
                 <input className="input" value={globalSearch} onChange={(e) => setGlobalSearch(e.target.value)} placeholder={l(lang, "Căn hộ, cư dân, phiếu thu, người thu...", "Apartment, resident, receipt, collector...")} />
               </div>
               <div>
-                <label className="label">{t(lang, "filterMonth")}</label>
+                <label className="label" style={{ fontSize: "0.78rem" }}>{t(lang, "filterMonth")}</label>
                 <select className="input" value={String(filterMonth)} onChange={(e) => setFilterMonth(e.target.value === "all" ? "all" : Number(e.target.value))}>
                   <option value="all">{t(lang, "all")}</option>
                   {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
               <div>
-                <label className="label">{t(lang, "filterYear")}</label>
+                <label className="label" style={{ fontSize: "0.78rem" }}>{t(lang, "filterYear")}</label>
                 <select className="input" value={String(filterYear)} onChange={(e) => setFilterYear(e.target.value === "all" ? "all" : Number(e.target.value))}>
                   <option value="all">{t(lang, "all")}</option>
                   {years.map((y) => <option key={y} value={y}>{y}</option>)}
                 </select>
               </div>
             </div>
-            {loading && <p className="muted mt-2">{t(lang, "loading")}</p>}
-            {errorText && <p className="error-text mt-2">{errorText}</p>}
+            {loading && <p className="muted" style={{ marginTop: "0.5rem", fontSize: "0.82rem" }}>{t(lang, "loading")}</p>}
+            {errorText && <p className="error-text" style={{ marginTop: "0.5rem" }}>{errorText}</p>}
           </section>
 
           {tab === "dashboard" && (
@@ -1601,7 +1586,7 @@ export default function Home() {
                   <input className="input" value={filterHouseholdQuery} onChange={(e) => setFilterHouseholdQuery(e.target.value)} placeholder={l(lang, "Lọc hộ theo căn hộ/chủ hộ/số điện thoại", "Filter households by apartment/owner/phone")} />
                   <select className="input" value={String(filterHouseholdFloor)} onChange={(e) => setFilterHouseholdFloor(e.target.value === "all" ? "all" : Number(e.target.value))}>
                     <option value="all">{l(lang, "Mọi tầng", "All floors")}</option>
-                    {Array.from(new Set(households.map((h) => h.floorNo))).sort((a, b) => a - b).map((floor) => <option key={floor} value={floor}>{l(lang, "Tầng", "Floor")} {floor}</option>)}
+                    {floorOptions.map((floor) => <option key={floor} value={floor}>{l(lang, "Tầng", "Floor")} {floor}</option>)}
                   </select>
                   <select className="input" value={filterHouseholdOwnership} onChange={(e) => setFilterHouseholdOwnership(e.target.value as "all" | "OWNER" | "TENANT")}>
                     <option value="all">{l(lang, "Mọi trạng thái sở hữu", "All ownership")}</option>
@@ -2063,7 +2048,7 @@ export default function Home() {
                 </select>
                 <select className="input" value={String(filterResidentFloor)} onChange={(e) => setFilterResidentFloor(e.target.value === "all" ? "all" : Number(e.target.value))}>
                   <option value="all">{l(lang, "Mọi tầng", "All floors")}</option>
-                  {Array.from(new Set(households.map((h) => h.floorNo))).sort((a, b) => a - b).map((floor) => <option key={floor} value={floor}>{l(lang, "Tầng", "Floor")} {floor}</option>)}
+                  {floorOptions.map((floor) => <option key={floor} value={floor}>{l(lang, "Tầng", "Floor")} {floor}</option>)}
                 </select>
                 <button className="btn-secondary" onClick={() => {
                   setFilterResidentGender("all");

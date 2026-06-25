@@ -1,5 +1,5 @@
 export async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(path, { cache: "no-store" });
+  const res = await fetch(path);
   if (!res.ok) {
     let message = `GET ${path} failed`;
     try {
