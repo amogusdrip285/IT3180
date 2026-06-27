@@ -19,6 +19,8 @@ export async function POST() {
   await db.userRole.deleteMany();
   await db.permission.deleteMany();
   await db.appRole.deleteMany();
+  await db.vehicleLog.deleteMany();
+  await db.vehicle.deleteMany();
   await db.payment.deleteMany();
   await db.obligation.deleteMany();
   await db.residencyEvent.deleteMany();
@@ -74,13 +76,20 @@ export async function POST() {
     ],
   });
 
+  // Vehicles & Logs
+  const vehicleLogPerm = await db.permission.create({ data: { code: "VEHICLE_LOG", name: "Vehicle log access", module: "VEHICLE", screen: "VEHICLE", description: "Vehicle log access" } });
+  const vehicleWritePerm = await db.permission.create({ data: { code: "VEHICLE_WRITE", name: "Vehicle management", module: "VEHICLE", screen: "VEHICLE", description: "Vehicle management" } });
+  const guardRole = await db.appRole.create({ data: { code: "GUARD", name: "Bảo vệ", description: "Chỉ ghi log ra/vào xe" } });
+  await db.rolePermission.createMany({ data: [{ roleId: guardRole.id, permissionId: vehicleLogPerm.id }] });
+  await db.rolePermission.createMany({ data: [{ roleId: adminRole.id, permissionId: vehicleWritePerm.id }, { roleId: adminRole.id, permissionId: vehicleLogPerm.id }] });
+
   const households = await Promise.all([
-    db.household.create({ data: { apartmentNo: "A-1203", floorNo: 12, ownerName: "Nguyễn Văn An", ownerPhone: "0903.111.203", emergencyContactName: "Nguyễn Thị Mai", emergencyContactPhone: "0909.100.203", parkingSlots: 1, moveInDate: new Date("2022-05-01"), ownershipStatus: "OWNER", areaM2: 68, status: "ACTIVE" } }),
-    db.household.create({ data: { apartmentNo: "B-1805", floorNo: 18, ownerName: "Trần Thị Hoa", ownerPhone: "0903.222.805", emergencyContactName: "Trần Văn Huy", emergencyContactPhone: "0909.200.805", parkingSlots: 2, moveInDate: new Date("2021-10-12"), ownershipStatus: "OWNER", areaM2: 82, status: "ACTIVE" } }),
-    db.household.create({ data: { apartmentNo: "C-2201", floorNo: 22, ownerName: "Lê Minh Đức", ownerPhone: "0903.333.201", emergencyContactName: "Lê Thu Hà", emergencyContactPhone: "0909.300.201", parkingSlots: 1, moveInDate: new Date("2023-01-20"), ownershipStatus: "TENANT", contractEndDate: new Date("2027-01-20"), areaM2: 95, status: "ACTIVE" } }),
-    db.household.create({ data: { apartmentNo: "A-0906", floorNo: 9, ownerName: "Phạm Hồng Hải", ownerPhone: "0903.444.906", emergencyContactName: "Phạm Huyền", emergencyContactPhone: "0909.400.906", parkingSlots: 0, moveInDate: new Date("2024-03-10"), ownershipStatus: "TENANT", contractEndDate: new Date("2026-12-31"), areaM2: 60, status: "ACTIVE" } }),
-    db.household.create({ data: { apartmentNo: "B-1102", floorNo: 11, ownerName: "Đào Thị Lan", ownerPhone: "0903.555.102", emergencyContactName: "Đào Quang", emergencyContactPhone: "0909.500.102", parkingSlots: 1, moveInDate: new Date("2020-09-09"), ownershipStatus: "OWNER", areaM2: 74, status: "ACTIVE" } }),
-    db.household.create({ data: { apartmentNo: "C-1508", floorNo: 15, ownerName: "Vũ Quốc Bình", ownerPhone: "0903.666.508", emergencyContactName: "Vũ Ngọc Anh", emergencyContactPhone: "0909.600.508", parkingSlots: 2, moveInDate: new Date("2022-11-18"), ownershipStatus: "OWNER", areaM2: 88, status: "ACTIVE" } }),
+    db.household.create({ data: { apartmentNo: "A-1203", floorNo: 12, ownerName: "Nguyễn Văn An", ownerPhone: "0903.111.203", emergencyContactName: "Nguyễn Thị Mai", emergencyContactPhone: "0909.100.203", moveInDate: new Date("2022-05-01"), ownershipStatus: "OWNER", areaM2: 68, status: "ACTIVE" } }),
+    db.household.create({ data: { apartmentNo: "B-1805", floorNo: 18, ownerName: "Trần Thị Hoa", ownerPhone: "0903.222.805", emergencyContactName: "Trần Văn Huy", emergencyContactPhone: "0909.200.805", moveInDate: new Date("2021-10-12"), ownershipStatus: "OWNER", areaM2: 82, status: "ACTIVE" } }),
+    db.household.create({ data: { apartmentNo: "C-2201", floorNo: 22, ownerName: "Lê Minh Đức", ownerPhone: "0903.333.201", emergencyContactName: "Lê Thu Hà", emergencyContactPhone: "0909.300.201", moveInDate: new Date("2023-01-20"), ownershipStatus: "TENANT", contractEndDate: new Date("2027-01-20"), areaM2: 95, status: "ACTIVE" } }),
+    db.household.create({ data: { apartmentNo: "A-0906", floorNo: 9, ownerName: "Phạm Hồng Hải", ownerPhone: "0903.444.906", emergencyContactName: "Phạm Huyền", emergencyContactPhone: "0909.400.906", moveInDate: new Date("2024-03-10"), ownershipStatus: "TENANT", contractEndDate: new Date("2026-12-31"), areaM2: 60, status: "ACTIVE" } }),
+    db.household.create({ data: { apartmentNo: "B-1102", floorNo: 11, ownerName: "Đào Thị Lan", ownerPhone: "0903.555.102", emergencyContactName: "Đào Quang", emergencyContactPhone: "0909.500.102", moveInDate: new Date("2020-09-09"), ownershipStatus: "OWNER", areaM2: 74, status: "ACTIVE" } }),
+    db.household.create({ data: { apartmentNo: "C-1508", floorNo: 15, ownerName: "Vũ Quốc Bình", ownerPhone: "0903.666.508", emergencyContactName: "Vũ Ngọc Anh", emergencyContactPhone: "0909.600.508", moveInDate: new Date("2022-11-18"), ownershipStatus: "OWNER", areaM2: 88, status: "ACTIVE" } }),
   ]);
 
   await db.communicationLog.createMany({
@@ -107,6 +116,58 @@ export async function POST() {
       { residentId: residents[7].id, eventType: "TEMP_RESIDENCE", fromDate: new Date("2026-03-01"), toDate: new Date("2026-08-30"), note: "Đăng ký tạm trú 6 tháng", createdBy: "Lê Văn Dũng" },
       { residentId: residents[3].id, eventType: "TEMP_ABSENCE", fromDate: new Date("2026-02-10"), toDate: new Date("2026-02-20"), note: "Đi công tác", createdBy: "Lê Văn Dũng" },
     ],
+  });
+
+  const vehicleDefs: Array<{ householdIdx: number; licensePlate: string; vehicleType: "CAR" | "MOTORBIKE" | "BICYCLE" | "OTHER" }> = [
+    { householdIdx: 0, licensePlate: "29A-12345", vehicleType: "CAR" },
+    { householdIdx: 1, licensePlate: "30B-67890", vehicleType: "CAR" },
+    { householdIdx: 1, licensePlate: "29H-54321", vehicleType: "MOTORBIKE" },
+    { householdIdx: 2, licensePlate: "51C-11111", vehicleType: "MOTORBIKE" },
+    { householdIdx: 4, licensePlate: "30E-77777", vehicleType: "CAR" },
+  ];
+
+  const createdVehicles = await Promise.all(
+    vehicleDefs.map((v) =>
+      db.vehicle.create({
+        data: {
+          householdId: households[v.householdIdx].id,
+          licensePlate: v.licensePlate,
+          vehicleType: v.vehicleType,
+          note: "",
+        },
+      }),
+    ),
+  );
+
+  const now = new Date();
+  const logEntries: Array<{ vehicleIdx: number; direction: "IN" | "OUT"; daysAgo: number; hour: number }> = [
+    { vehicleIdx: 0, direction: "IN", daysAgo: 0, hour: 19 },
+    { vehicleIdx: 1, direction: "IN", daysAgo: 0, hour: 18 },
+    { vehicleIdx: 2, direction: "IN", daysAgo: 0, hour: 17 },
+    { vehicleIdx: 3, direction: "IN", daysAgo: 0, hour: 20 },
+    { vehicleIdx: 4, direction: "IN", daysAgo: 0, hour: 18 },
+    { vehicleIdx: 0, direction: "OUT", daysAgo: 1, hour: 7 },
+    { vehicleIdx: 1, direction: "OUT", daysAgo: 1, hour: 6 },
+    { vehicleIdx: 2, direction: "OUT", daysAgo: 1, hour: 7 },
+    { vehicleIdx: 4, direction: "OUT", daysAgo: 1, hour: 8 },
+    { vehicleIdx: 0, direction: "IN", daysAgo: 1, hour: 18 },
+    { vehicleIdx: 2, direction: "IN", daysAgo: 1, hour: 19 },
+    { vehicleIdx: 0, direction: "OUT", daysAgo: 2, hour: 6 },
+    { vehicleIdx: 2, direction: "OUT", daysAgo: 2, hour: 7 },
+  ];
+
+  await db.vehicleLog.createMany({
+    data: logEntries.map((e) => {
+      const ts = new Date(now);
+      ts.setDate(ts.getDate() - e.daysAgo);
+      ts.setHours(e.hour, 0, 0, 0);
+      return {
+        vehicleId: createdVehicles[e.vehicleIdx].id,
+        direction: e.direction,
+        timestamp: ts,
+        note: "",
+      };
+    }),
   });
 
   const service = await db.feeType.create({ data: { code: "SERVICE_FEE", name: "Phí dịch vụ", category: "MANDATORY", calcMethod: "PER_M2", rate: 7000, graceDays: 5, lateFeeRule: "0.05%/day", effectiveFrom: new Date("2025-01-01"), policyNote: "Ap dung toan khu", active: true } });

@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
     attachmentUrl?: string;
     reversalNote?: string;
   };
+  const collectorName = body.collectorName || auth.user!.fullName;
   if (!Number.isFinite(body.obligationId) || !Number.isFinite(body.paidAmount) || body.paidAmount <= 0) {
     return apiError("VALIDATION_ERROR", "Invalid payment payload", 400);
   }
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
         feeTypeId: obligation.period.feeTypeId,
         paidAmount: applied,
         method: body.method,
-        collectorName: body.collectorName || "Không rõ",
+        collectorName,
         payerName: body.payerName || "",
         payerPhone: body.payerPhone || "",
         bankTxRef: body.bankTxRef || "",

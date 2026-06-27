@@ -1,6 +1,6 @@
 export type Lang = "en" | "vi";
 
-export type Role = "ADMIN" | "ACCOUNTANT" | "TEAM_LEADER";
+export type Role = "ADMIN" | "ACCOUNTANT" | "TEAM_LEADER" | "GUARD";
 
 export type User = {
   id: number;
@@ -42,9 +42,9 @@ export type Household = {
   floorNo: number;
   ownerName: string;
   ownerPhone: string;
+  ownerId?: number | null;
   emergencyContactName?: string | null;
   emergencyContactPhone?: string | null;
-  parkingSlots?: number;
   moveInDate?: string | null;
   ownershipStatus?: "OWNER" | "TENANT";
   contractEndDate?: string | null;
@@ -56,6 +56,7 @@ export type Resident = {
   id: number;
   householdId: number;
   fullName: string;
+  phone?: string | null;
   dob: string;
   gender: "MALE" | "FEMALE" | "OTHER";
   idNo: string;
@@ -130,4 +131,27 @@ export type ResidencyEvent = {
   toDate: string;
   note: string;
   createdBy: string;
+};
+
+export type VehicleType = "CAR" | "MOTORBIKE" | "BICYCLE" | "OTHER";
+
+export type Vehicle = {
+  id: number;
+  householdId: number;
+  licensePlate: string;
+  vehicleType: VehicleType;
+  brand?: string;
+  color?: string;
+  note?: string;
+  registeredAt: string;
+};
+
+export type VehicleLogDirection = "IN" | "OUT";
+
+export type VehicleLog = {
+  id: number;
+  vehicleId: number;
+  direction: VehicleLogDirection;
+  timestamp: string;
+  note?: string;
 };

@@ -9,7 +9,7 @@ export type AuthUser = {
   fullName: string;
   avatarUrl: string;
   address: string;
-  role: "ADMIN" | "ACCOUNTANT" | "TEAM_LEADER";
+  role: "ADMIN" | "ACCOUNTANT" | "TEAM_LEADER" | "GUARD";
   roleCodes: string[];
   permissionCodes: string[];
   status: "ACTIVE" | "BLOCKED";
@@ -94,14 +94,14 @@ export async function requireAuth(): Promise<{ user: AuthUser | null; error?: Ne
   return { user };
 }
 
-export function requireRole(user: AuthUser, allowed: Array<"ADMIN" | "ACCOUNTANT" | "TEAM_LEADER">): NextResponse | null {
+export function requireRole(user: AuthUser, allowed: Array<"ADMIN" | "ACCOUNTANT" | "TEAM_LEADER" | "GUARD">): NextResponse | null {
   if (!allowed.includes(user.role)) {
     return apiError("PERMISSION_DENIED", "Permission denied", 403);
   }
   return null;
 }
 
-export function requirePermission(user: AuthUser, module: "SYSTEM" | "FEE" | "RESIDENT" | "REPORT", action: "READ" | "WRITE" | "ADMIN"): NextResponse | null {
+export function requirePermission(user: AuthUser, module: "SYSTEM" | "FEE" | "RESIDENT" | "REPORT" | "VEHICLE", action: "READ" | "WRITE" | "ADMIN" | "LOG"): NextResponse | null {
   if (user.roleCodes.includes("ADMIN")) return null;
   const direct = `${module}_${action}`;
   const broad = `${module}_ADMIN`;

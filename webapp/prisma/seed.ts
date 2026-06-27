@@ -14,6 +14,8 @@ async function main() {
   await prisma.userRole.deleteMany();
   await prisma.permission.deleteMany();
   await prisma.appRole.deleteMany();
+  await prisma.vehicleLog.deleteMany();
+  await prisma.vehicle.deleteMany();
   await prisma.payment.deleteMany();
   await prisma.obligation.deleteMany();
   await prisma.residencyEvent.deleteMany();
@@ -104,6 +106,47 @@ async function main() {
   await grant(accountantRole.id, ["FEE_READ", "FEE_WRITE", "RESIDENT_READ", "REPORT_READ"]);
   await grant(leaderRole.id, ["FEE_READ", "RESIDENT_READ", "RESIDENT_WRITE", "REPORT_READ"]);
 
+  // ===== GUARD role & VEHICLE permissions =====
+  await prisma.permission.createMany({
+    data: [
+      { code: "VEHICLE_LOG", name: "Vehicle log access", module: "VEHICLE" },
+      { code: "VEHICLE_WRITE", name: "Vehicle management", module: "VEHICLE" },
+    ],
+  });
+
+  const guardRole = await prisma.appRole.upsert({
+    where: { code: "GUARD" },
+    update: {},
+    create: { code: "GUARD", name: "Bảo vệ", description: "Chỉ ghi log ra/vào xe" },
+  });
+
+  const vehicleLogPerm = await prisma.permission.findUnique({ where: { code: "VEHICLE_LOG" } });
+  if (vehicleLogPerm) {
+    await prisma.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId: guardRole.id, permissionId: vehicleLogPerm.id } },
+      update: {},
+      create: { roleId: guardRole.id, permissionId: vehicleLogPerm.id },
+    });
+  }
+
+  // Give VEHICLE_WRITE + VEHICLE_LOG to ADMIN role
+  const adminAppRole = await prisma.appRole.findUnique({ where: { code: "ADMIN" } });
+  const vehicleWritePerm = await prisma.permission.findUnique({ where: { code: "VEHICLE_WRITE" } });
+  if (adminAppRole && vehicleWritePerm) {
+    await prisma.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId: adminAppRole.id, permissionId: vehicleWritePerm.id } },
+      update: {},
+      create: { roleId: adminAppRole.id, permissionId: vehicleWritePerm.id },
+    });
+  }
+  if (adminAppRole && vehicleLogPerm) {
+    await prisma.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId: adminAppRole.id, permissionId: vehicleLogPerm.id } },
+      update: {},
+      create: { roleId: adminAppRole.id, permissionId: vehicleLogPerm.id },
+    });
+  }
+
   await prisma.userRole.createMany({
     data: [
       { userId: createdUsers[0].id, roleId: adminRole.id },
@@ -118,14 +161,67 @@ async function main() {
   });
 
   const baseHouseholds = await Promise.all([
-    prisma.household.create({ data: { apartmentNo: "A-1203", floorNo: 12, ownerName: "Nguyễn Văn An", ownerPhone: "0903.111.203", emergencyContactName: "Nguyễn Thị Mai", emergencyContactPhone: "0909.100.203", parkingSlots: 1, moveInDate: new Date("2022-05-01"), ownershipStatus: "OWNER", contractEndDate: null, areaM2: 68, status: "ACTIVE" } }),
-    prisma.household.create({ data: { apartmentNo: "B-1805", floorNo: 18, ownerName: "Trần Thị Hoa", ownerPhone: "0903.222.805", emergencyContactName: "Trần Văn Huy", emergencyContactPhone: "0909.200.805", parkingSlots: 2, moveInDate: new Date("2021-10-12"), ownershipStatus: "OWNER", contractEndDate: null, areaM2: 82, status: "ACTIVE" } }),
-    prisma.household.create({ data: { apartmentNo: "C-2201", floorNo: 22, ownerName: "Lê Minh Đức", ownerPhone: "0903.333.201", emergencyContactName: "Lê Thu Hà", emergencyContactPhone: "0909.300.201", parkingSlots: 1, moveInDate: new Date("2023-01-20"), ownershipStatus: "TENANT", contractEndDate: new Date("2027-01-20"), areaM2: 95, status: "ACTIVE" } }),
-    prisma.household.create({ data: { apartmentNo: "A-0906", floorNo: 9, ownerName: "Phạm Hồng Hải", ownerPhone: "0903.444.906", emergencyContactName: "Phạm Huyền", emergencyContactPhone: "0909.400.906", parkingSlots: 0, moveInDate: new Date("2024-03-10"), ownershipStatus: "TENANT", contractEndDate: new Date("2026-12-31"), areaM2: 60, status: "ACTIVE" } }),
-    prisma.household.create({ data: { apartmentNo: "B-1102", floorNo: 11, ownerName: "Đào Thị Lan", ownerPhone: "0903.555.102", emergencyContactName: "Đào Quang", emergencyContactPhone: "0909.500.102", parkingSlots: 1, moveInDate: new Date("2020-09-09"), ownershipStatus: "OWNER", contractEndDate: null, areaM2: 74, status: "ACTIVE" } }),
+    prisma.household.create({ data: { apartmentNo: "A-1203", floorNo: 12, ownerName: "Nguyễn Văn An", ownerPhone: "0903.111.203", emergencyContactName: "Nguyễn Thị Mai", emergencyContactPhone: "0909.100.203", moveInDate: new Date("2022-05-01"), ownershipStatus: "OWNER", contractEndDate: null, areaM2: 68, status: "ACTIVE" } }),
+    prisma.household.create({ data: { apartmentNo: "B-1805", floorNo: 18, ownerName: "Trần Thị Hoa", ownerPhone: "0903.222.805", emergencyContactName: "Trần Văn Huy", emergencyContactPhone: "0909.200.805", moveInDate: new Date("2021-10-12"), ownershipStatus: "OWNER", contractEndDate: null, areaM2: 82, status: "ACTIVE" } }),
+    prisma.household.create({ data: { apartmentNo: "C-2201", floorNo: 22, ownerName: "Lê Minh Đức", ownerPhone: "0903.333.201", emergencyContactName: "Lê Thu Hà", emergencyContactPhone: "0909.300.201", moveInDate: new Date("2023-01-20"), ownershipStatus: "TENANT", contractEndDate: new Date("2027-01-20"), areaM2: 95, status: "ACTIVE" } }),
+    prisma.household.create({ data: { apartmentNo: "A-0906", floorNo: 9, ownerName: "Phạm Hồng Hải", ownerPhone: "0903.444.906", emergencyContactName: "Phạm Huyền", emergencyContactPhone: "0909.400.906", moveInDate: new Date("2024-03-10"), ownershipStatus: "TENANT", contractEndDate: new Date("2026-12-31"), areaM2: 60, status: "ACTIVE" } }),
+    prisma.household.create({ data: { apartmentNo: "B-1102", floorNo: 11, ownerName: "Đào Thị Lan", ownerPhone: "0903.555.102", emergencyContactName: "Đào Quang", emergencyContactPhone: "0909.500.102", moveInDate: new Date("2020-09-09"), ownershipStatus: "OWNER", contractEndDate: null, areaM2: 74, status: "ACTIVE" } }),
   ]);
 
   const households = baseHouseholds;
+
+  // ===== Vehicles =====
+  const vehicleDefs: Array<{ householdIdx: number; licensePlate: string; vehicleType: "CAR" | "MOTORBIKE" | "BICYCLE" | "OTHER" }> = [
+    { householdIdx: 0, licensePlate: "29A-12345", vehicleType: "CAR" },
+    { householdIdx: 1, licensePlate: "30B-67890", vehicleType: "CAR" },
+    { householdIdx: 1, licensePlate: "29H-54321", vehicleType: "MOTORBIKE" },
+    { householdIdx: 2, licensePlate: "51C-11111", vehicleType: "MOTORBIKE" },
+    { householdIdx: 4, licensePlate: "30E-77777", vehicleType: "CAR" },
+  ];
+
+  const createdVehicles = await Promise.all(
+    vehicleDefs.map((v) =>
+      prisma.vehicle.create({
+        data: {
+          householdId: households[v.householdIdx].id,
+          licensePlate: v.licensePlate,
+          vehicleType: v.vehicleType,
+          note: "",
+        },
+      }),
+    ),
+  );
+
+  const now = new Date();
+  const logEntries: Array<{ vehicleIdx: number; direction: "IN" | "OUT"; daysAgo: number; hour: number }> = [
+    { vehicleIdx: 0, direction: "IN", daysAgo: 0, hour: 19 },
+    { vehicleIdx: 1, direction: "IN", daysAgo: 0, hour: 18 },
+    { vehicleIdx: 2, direction: "IN", daysAgo: 0, hour: 17 },
+    { vehicleIdx: 3, direction: "IN", daysAgo: 0, hour: 20 },
+    { vehicleIdx: 4, direction: "IN", daysAgo: 0, hour: 18 },
+    { vehicleIdx: 0, direction: "OUT", daysAgo: 1, hour: 7 },
+    { vehicleIdx: 1, direction: "OUT", daysAgo: 1, hour: 6 },
+    { vehicleIdx: 2, direction: "OUT", daysAgo: 1, hour: 7 },
+    { vehicleIdx: 4, direction: "OUT", daysAgo: 1, hour: 8 },
+    { vehicleIdx: 0, direction: "IN", daysAgo: 1, hour: 18 },
+    { vehicleIdx: 2, direction: "IN", daysAgo: 1, hour: 19 },
+    { vehicleIdx: 0, direction: "OUT", daysAgo: 2, hour: 6 },
+    { vehicleIdx: 2, direction: "OUT", daysAgo: 2, hour: 7 },
+  ];
+
+  await prisma.vehicleLog.createMany({
+    data: logEntries.map((e) => {
+      const ts = new Date(now);
+      ts.setDate(ts.getDate() - e.daysAgo);
+      ts.setHours(e.hour, 0, 0, 0);
+      return {
+        vehicleId: createdVehicles[e.vehicleIdx].id,
+        direction: e.direction,
+        timestamp: ts,
+        note: "",
+      };
+    }),
+  });
 
   await prisma.communicationLog.createMany({
     data: households.flatMap((h, idx) => [

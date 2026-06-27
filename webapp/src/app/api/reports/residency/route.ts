@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAuth, requirePermission } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { makeSimplePdf } from "@/lib/pdf";
+import { makeExcelBuffer } from "@/lib/excel";
 
 export const runtime = "nodejs";
 
@@ -68,6 +69,36 @@ export async function GET(req: Request) {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": "attachment; filename=residency_report.pdf",
+      },
+    });
+  }
+
+  if (format === "xlsx") {
+    const buffer = await makeExcelBuffer(
+      "Báo cáo cư trú BlueMoon",
+      [
+        { header: "Căn hộ", key: "apartment", width: 12 },
+        { header: "Cư dân", key: "name", width: 20 },
+        { header: "Số CCCD", key: "idNo", width: 15 },
+        { header: "Loại biến động", key: "eventType", width: 18 },
+        { header: "Từ ngày", key: "fromDate", width: 20 },
+        { header: "Đến ngày", key: "toDate", width: 20 },
+        { header: "Ghi chú", key: "note", width: 25 },
+      ],
+      rows.map((e) => ({
+        apartment: e.resident.household.apartmentNo,
+        name: e.resident.fullName,
+        idNo: e.resident.idNo,
+        eventType: e.eventType,
+        fromDate: e.fromDate.toISOString(),
+        toDate: e.toDate ? e.toDate.toISOString() : "",
+        note: e.note,
+      })),
+    );
+    return new NextResponse(new Uint8Array(buffer), {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": "attachment; filename=residency_report.xlsx",
       },
     });
   }

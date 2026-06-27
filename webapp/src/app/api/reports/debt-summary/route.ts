@@ -3,6 +3,7 @@ import { requireAuth, requirePermission } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { apiError } from "@/lib/errors";
 import { makeSimplePdf } from "@/lib/pdf";
+import { makeExcelBuffer } from "@/lib/excel";
 
 export const runtime = "nodejs";
 
@@ -94,6 +95,38 @@ export async function GET(req: NextRequest) {
         "Content-Disposition": householdId
           ? `attachment; filename=debt_summary_household_${householdId}.pdf`
           : "attachment; filename=debt_summary.pdf",
+      },
+    });
+  }
+
+  if (format === "xlsx") {
+    const buffer = await makeExcelBuffer(
+      "Báo cáo công nợ BlueMoon",
+      [
+        { header: "Căn hộ", key: "apartment", width: 12 },
+        { header: "Chủ hộ", key: "owner", width: 20 },
+        { header: "Kỳ", key: "period", width: 12 },
+        { header: "Khoản phí", key: "fee", width: 20 },
+        { header: "Phải thu", key: "due", width: 15 },
+        { header: "Đã nộp", key: "paid", width: 15 },
+        { header: "Còn nợ", key: "outstanding", width: 15 },
+      ],
+      debtRows.map((r) => ({
+        apartment: r.apartmentNo,
+        owner: r.ownerName,
+        period: r.periodLabel,
+        fee: r.feeName,
+        due: r.amountDue.toLocaleString("vi-VN") + " VND",
+        paid: r.amountPaid.toLocaleString("vi-VN") + " VND",
+        outstanding: r.outstanding.toLocaleString("vi-VN") + " VND",
+      })),
+    );
+    return new NextResponse(new Uint8Array(buffer), {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": householdId
+          ? `attachment; filename=debt_summary_household_${householdId}.xlsx`
+          : "attachment; filename=debt_summary.xlsx",
       },
     });
   }

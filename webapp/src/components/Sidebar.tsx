@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 
-type Tab = "dashboard" | "fees" | "periods" | "obligations" | "households" | "residents" | "events" | "users" | "reports" | "account" | "handbook";
+type Tab = "dashboard" | "fees" | "periods" | "obligations" | "households" | "residents" | "events" | "vehicles" | "users" | "reports" | "account" | "handbook";
 
 export const Sidebar = memo(function Sidebar({
   tab,
@@ -17,7 +17,7 @@ export const Sidebar = memo(function Sidebar({
   title: string;
   visibleTabs?: Tab[];
 }) {
-  const tabs: Tab[] = visibleTabs && visibleTabs.length > 0 ? visibleTabs : ["dashboard", "account", "fees", "periods", "obligations", "households", "residents", "events", "users", "reports", "handbook"];
+  const tabs: Tab[] = visibleTabs && visibleTabs.length > 0 ? visibleTabs : ["dashboard", "account", "fees", "periods", "obligations", "households", "residents", "events", "vehicles", "users", "reports", "handbook"];
 
   return (
     <aside className="card h-fit" style={{ padding: "0.65rem" }}>

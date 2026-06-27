@@ -21,6 +21,19 @@ enum Role {
   ADMIN
   ACCOUNTANT
   TEAM_LEADER
+  GUARD
+}
+
+enum VehicleType {
+  CAR
+  MOTORBIKE
+  BICYCLE
+  OTHER
+}
+
+enum VehicleLogDirection {
+  IN
+  OUT
 }
 
 enum HouseholdStatus {
@@ -88,6 +101,7 @@ enum AuditAction {
   LOCK
   UNLOCK
   COLLECT_PAYMENT
+  VEHICLE_LOG
 }
 
 model User {
@@ -152,17 +166,19 @@ model Household {
   id          Int             @id @default(autoincrement())
   apartmentNo String          @unique
   floorNo     Int
-  ownerName   String
-  ownerPhone  String
+  ownerName   String          @default("")
+  ownerPhone  String          @default("")
+  ownerId     Int?            @unique
+  owner       Resident?       @relation("HeadOfHousehold", fields: [ownerId], references: [id])
   emergencyContactName String?
   emergencyContactPhone String?
-  parkingSlots Int @default(0)
   moveInDate DateTime?
   ownershipStatus OwnershipStatus @default(OWNER)
   contractEndDate DateTime?
   areaM2      Float
   status      HouseholdStatus @default(ACTIVE)
   residents   Resident[]
+  vehicles    Vehicle[]
   obligations Obligation[]
   communications CommunicationLog[]
   createdAt   DateTime @default(now())
@@ -172,11 +188,13 @@ model Resident {
   id           Int          @id @default(autoincrement())
   householdId  Int
   fullName     String
+  phone        String?
   dob          DateTime
   gender       String
   idNo         String       @unique
   residentType ResidentType
   household    Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  headOfHousehold Household? @relation("HeadOfHousehold")
   events       ResidencyEvent[]
   createdAt    DateTime     @default(now())
 
@@ -264,6 +282,34 @@ model Payment {
   @@index([feeTypeId])
   @@index([paidAt])
   @@index([method])
+}
+
+model Vehicle {
+  id            Int         @id @default(autoincrement())
+  householdId   Int
+  licensePlate  String      @unique
+  vehicleType   VehicleType
+  brand         String?
+  color         String?
+  note          String      @default("")
+  registeredAt  DateTime    @default(now())
+  household     Household   @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  logs          VehicleLog[]
+
+  @@index([householdId])
+  @@index([licensePlate])
+}
+
+model VehicleLog {
+  id        Int                @id @default(autoincrement())
+  vehicleId Int
+  direction VehicleLogDirection
+  timestamp DateTime           @default(now())
+  note      String             @default("")
+  vehicle   Vehicle            @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
+  @@index([timestamp])
 }
 
 model CommunicationLog {

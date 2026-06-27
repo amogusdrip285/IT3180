@@ -22,7 +22,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     ownerPhone?: string;
     emergencyContactName?: string;
     emergencyContactPhone?: string;
-    parkingSlots?: number;
     moveInDate?: string | null;
     ownershipStatus?: "OWNER" | "TENANT";
     contractEndDate?: string | null;
@@ -32,17 +31,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   const floorNoParsed = body.floorNo == null ? undefined : toSafeInt(body.floorNo);
   const area = body.areaM2 == null ? undefined : toSafeNumber(body.areaM2);
-  const parkingSlotsParsed = body.parkingSlots == null ? undefined : toSafeInt(body.parkingSlots);
 
   if (body.ownerPhone && !isPhone(body.ownerPhone)) return apiError("VALIDATION_ERROR", "Invalid owner phone format", 400, { field: "ownerPhone" });
   if (body.emergencyContactPhone && !isPhone(body.emergencyContactPhone)) return apiError("VALIDATION_ERROR", "Invalid emergency phone format", 400, { field: "emergencyContactPhone" });
   if (body.floorNo != null && floorNoParsed == null) return apiError("VALIDATION_ERROR", "Invalid floor number", 400, { field: "floorNo" });
   if (area != null && area <= 0) return apiError("VALIDATION_ERROR", "Invalid area", 400, { field: "areaM2" });
-  if (body.parkingSlots != null && parkingSlotsParsed == null) return apiError("VALIDATION_ERROR", "Invalid parking slots", 400, { field: "parkingSlots" });
-  if (parkingSlotsParsed != null && parkingSlotsParsed < 0) return apiError("VALIDATION_ERROR", "Invalid parking slots", 400, { field: "parkingSlots" });
 
   const floorNo = floorNoParsed == null ? undefined : floorNoParsed;
-  const parkingSlots = parkingSlotsParsed == null ? undefined : parkingSlotsParsed;
 
   const areaM2 = area == null ? undefined : area;
   const moveInDate = body.moveInDate === null ? null : body.moveInDate ? new Date(body.moveInDate) : undefined;
@@ -59,7 +54,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       ownerPhone: body.ownerPhone,
       emergencyContactName: body.emergencyContactName,
       emergencyContactPhone: body.emergencyContactPhone,
-      parkingSlots,
       moveInDate,
       ownershipStatus: body.ownershipStatus,
       contractEndDate,

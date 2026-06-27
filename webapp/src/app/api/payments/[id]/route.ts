@@ -53,8 +53,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 export async function DELETE(_: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
-  const deny = requirePermission(auth.user!, "FEE", "WRITE");
-  if (deny) return deny;
+  const roleCodes = auth.user!.roleCodes ?? [auth.user!.role];
+  if (!roleCodes.includes("ADMIN")) {
+    return apiError("FORBIDDEN", "Only admin can delete receipts. Please contact admin.", 403);
+  }
 
   const { id } = await ctx.params;
   const num = Number(id);

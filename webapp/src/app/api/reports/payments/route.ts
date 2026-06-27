@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAuth, requirePermission } from "@/lib/auth";
 import { makeSimplePdf } from "@/lib/pdf";
+import { makeExcelBuffer } from "@/lib/excel";
 
 export const runtime = "nodejs";
 
@@ -107,6 +108,38 @@ export async function GET(req: NextRequest) {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": "attachment; filename=payment_report.pdf",
+      },
+    });
+  }
+
+  if (format === "xlsx") {
+    const buffer = await makeExcelBuffer(
+      "Báo cáo thu phí BlueMoon",
+      [
+        { header: "Mã phiếu thu", key: "receiptNo", width: 18 },
+        { header: "Ngày thu", key: "paidAt", width: 20 },
+        { header: "Người thu", key: "collector", width: 20 },
+        { header: "Căn hộ", key: "apartment", width: 12 },
+        { header: "Khoản phí", key: "feeType", width: 20 },
+        { header: "Số tiền", key: "amount", width: 15 },
+        { header: "Phương thức", key: "method", width: 12 },
+        { header: "Ghi chú", key: "note", width: 25 },
+      ],
+      filtered.map((p) => ({
+          receiptNo: p.receiptNo,
+          paidAt: p.paidAt.toLocaleString("vi-VN"),
+          collector: p.collectorName,
+          apartment: p.obligation.household.apartmentNo,
+          feeType: p.feeType.name,
+          amount: p.paidAmount.toLocaleString("vi-VN") + " VND",
+          method: p.method === "CASH" ? "Tiền mặt" : "Chuyển khoản",
+          note: p.note,
+        })),
+    );
+    return new NextResponse(new Uint8Array(buffer), {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": "attachment; filename=payment_report.xlsx",
       },
     });
   }

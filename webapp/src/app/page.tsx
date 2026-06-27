@@ -9,12 +9,12 @@ import { DonutChart } from "@/components/DonutChart";
 import { HelpModal } from "@/components/HelpModal";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { Sidebar } from "@/components/Sidebar";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiGet, apiPost, apiDelete } from "@/lib/api";
 import { canPermission } from "@/lib/permission";
 import { t } from "@/lib/i18n";
-import type { AppRole, CommunicationLog, FeePeriod, FeeType, Household, Lang, Obligation, Payment, PermissionItem, ResidencyEvent, Resident, User } from "@/lib/types";
+import type { AppRole, CommunicationLog, FeePeriod, FeeType, Household, Lang, Obligation, Payment, PermissionItem, ResidencyEvent, Resident, User, Vehicle, VehicleLog, VehicleLogDirection, VehicleType } from "@/lib/types";
 
-type Tab = "dashboard" | "fees" | "periods" | "obligations" | "households" | "residents" | "events" | "users" | "reports" | "account" | "handbook";
+type Tab = "dashboard" | "fees" | "periods" | "obligations" | "households" | "residents" | "events" | "vehicles" | "users" | "reports" | "account" | "handbook";
 const API_BASE = "/api";
 
 function formatVnd(value: number): string {
@@ -55,6 +55,8 @@ export default function Home() {
   const [obligations, setObligations] = useState<Obligation[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [events, setEvents] = useState<ResidencyEvent[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [vehicleLogs, setVehicleLogs] = useState<VehicleLog[]>([]);
   const [communications, setCommunications] = useState<Array<CommunicationLog & { household?: Household }>>([]);
   const [analytics, setAnalytics] = useState<{
     aging: Array<{ label: string; count: number; amount: number }>;
@@ -76,7 +78,7 @@ export default function Home() {
   const [selectedPaymentFeeTypeId, setSelectedPaymentFeeTypeId] = useState<number>(0);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "BANK">("CASH");
-  const [collectorName, setCollectorName] = useState("");
+  const collectorName = user?.fullName ?? "";
   const [paymentNote, setPaymentNote] = useState("");
   const [payerName, setPayerName] = useState("");
   const [payerPhone, setPayerPhone] = useState("");
@@ -97,7 +99,6 @@ export default function Home() {
   const [newOwnerPhone, setNewOwnerPhone] = useState("");
   const [newEmergencyName, setNewEmergencyName] = useState("");
   const [newEmergencyPhone, setNewEmergencyPhone] = useState("");
-  const [newParkingSlots, setNewParkingSlots] = useState("0");
   const [newMoveInDate, setNewMoveInDate] = useState("");
   const [newOwnershipStatus, setNewOwnershipStatus] = useState<"OWNER" | "TENANT">("OWNER");
   const [newContractEndDate, setNewContractEndDate] = useState("");
@@ -200,6 +201,14 @@ export default function Home() {
   const [filterPaymentFromDate, setFilterPaymentFromDate] = useState("");
   const [filterPaymentToDate, setFilterPaymentToDate] = useState("");
 
+  const [newVehicleHouseholdId, setNewVehicleHouseholdId] = useState<number>(0);
+  const [newVehicleLicensePlate, setNewVehicleLicensePlate] = useState("");
+  const [newVehicleType, setNewVehicleType] = useState<VehicleType>("CAR");
+  const [logSelectedHouseholdId, setLogSelectedHouseholdId] = useState<number>(0);
+  const [logVehicleId, setLogVehicleId] = useState<number>(0);
+  const [logDirection, setLogDirection] = useState<VehicleLogDirection>("IN");
+  const [logTimestamp, setLogTimestamp] = useState("");
+
   const [filterMonth, setFilterMonth] = useState<number | "all">("all");
   const [filterYear, setFilterYear] = useState<number | "all">("all");
   const [filterType] = useState<"all" | "MANDATORY" | "VOLUNTARY">("all");
@@ -223,6 +232,7 @@ export default function Home() {
     households: t(lang, "households"),
     residents: t(lang, "residents"),
     events: t(lang, "residencyEvents"),
+    vehicles: t(lang, "vehicles"),
     users: t(lang, "users"),
     reports: t(lang, "reports"),
     account: l(lang, "Tài khoản", "Account"),
@@ -271,6 +281,7 @@ export default function Home() {
     const tabs: Tab[] = ["dashboard", "account"];
     if (canPermission(user, "FEE", "READ")) tabs.push("fees", "periods", "obligations");
     if (canPermission(user, "RESIDENT", "READ")) tabs.push("households", "residents", "events");
+    if (canPermission(user, "VEHICLE", "LOG") || canPermission(user, "VEHICLE", "WRITE")) tabs.push("vehicles");
     if (canPermission(user, "SYSTEM", "ADMIN")) tabs.push("users");
     if (canPermission(user, "REPORT", "READ")) tabs.push("reports");
     tabs.push("handbook");
@@ -286,7 +297,7 @@ export default function Home() {
     setLoading(true);
     setErrorText("");
     try {
-      const [u, h, r, f, p, o, pay, ev, comm, an, roleRows, permRows] = await Promise.all([
+      const [u, h, r, f, p, o, pay, ev, v, vl, comm, an, roleRows, permRows] = await Promise.all([
         apiGetAllPages<User>(`${API_BASE}/users`).catch(() => []),
         apiGetAllPages<Household>(`${API_BASE}/households`),
         apiGetAllPages<Resident>(`${API_BASE}/residents`),
@@ -295,12 +306,13 @@ export default function Home() {
         apiGetAllPages<Obligation>(`${API_BASE}/obligations`),
         apiGetAllPages<Payment>(`${API_BASE}/payments`),
         apiGetAllPages<ResidencyEvent>(`${API_BASE}/residency-events`),
+        apiGetAllPages<Vehicle>(`${API_BASE}/vehicles`).catch(() => []),
+        apiGetAllPages<VehicleLog>(`${API_BASE}/vehicle-logs`).catch(() => []),
         apiGetAllPages<CommunicationLog & { household?: Household }>(`${API_BASE}/communication-logs`),
         apiGet<{ aging: Array<{ label: string; count: number; amount: number }>; collectionByMonth: Array<{ label: string; due: number; paid: number; rate: number }>; byCollector: Array<{ collector: string; amount: number }>; byFloor: Array<{ floor: number; due: number; paid: number; rate: number }>; voluntaryStats: { participatingHouseholds: number; totalHouseholds: number; participationRate: number; totalAmount: number; averageContribution: number } }>(`${API_BASE}/reports/analytics`),
         apiGet<AppRole[]>(`${API_BASE}/roles`).catch(() => []),
         apiGet<PermissionItem[]>(`${API_BASE}/permissions`).catch(() => []),
       ]);
-
       setUsers(u);
       setHouseholds(h);
       setResidents(r);
@@ -309,6 +321,8 @@ export default function Home() {
       setObligations(o);
       setPayments(pay);
       setEvents(ev);
+      setVehicles(v);
+      setVehicleLogs(vl);
       setCommunications(comm);
       setAnalytics(an);
       setRoles(roleRows);
@@ -542,6 +556,14 @@ export default function Home() {
   useEffect(() => {
     if (pagePaymentsTab > totalPaymentsTabPages) setPagePaymentsTab(totalPaymentsTabPages);
   }, [pagePaymentsTab, totalPaymentsTabPages]);
+
+  useEffect(() => {
+    const hh = households.find((x) => x.id === selectedPaymentHouseholdId);
+    if (!hh) return;
+    const owner = residents.find((r) => r.id === hh.ownerId);
+    setPayerName(owner?.fullName ?? hh.ownerName);
+    setPayerPhone(owner?.phone ?? hh.ownerPhone ?? "");
+  }, [selectedPaymentHouseholdId, households, residents]);
 
   useEffect(() => {
     if (pageEvents > totalEventPages) setPageEvents(totalEventPages);
@@ -874,14 +896,12 @@ export default function Home() {
   function addHousehold() {
     const floor = Number(newFloorNo);
     const area = Number(newAreaM2);
-    const parkingSlots = Number(newParkingSlots);
     let valid = true;
     if (!newApartmentNo.trim()) { setFieldError("newApartmentNo", l(lang, "Bắt buộc", "Required")); valid = false; } else clearFieldError("newApartmentNo");
     if (!Number.isFinite(floor)) { setFieldError("newFloorNo", l(lang, "Tầng không hợp lệ", "Invalid floor")); valid = false; } else clearFieldError("newFloorNo");
     if (!newOwnerName.trim()) { setFieldError("newOwnerName", l(lang, "Bắt buộc", "Required")); valid = false; } else clearFieldError("newOwnerName");
     if (!newOwnerPhone.trim()) { setFieldError("newOwnerPhone", l(lang, "Bắt buộc", "Required")); valid = false; } else clearFieldError("newOwnerPhone");
     if (!Number.isFinite(area) || area <= 0) { setFieldError("newAreaM2", l(lang, "Diện tích không hợp lệ", "Invalid area")); valid = false; } else clearFieldError("newAreaM2");
-    if (!Number.isFinite(parkingSlots) || parkingSlots < 0) { setFieldError("newParkingSlots", l(lang, "Số chỗ xe không hợp lệ", "Invalid parking slots")); valid = false; } else clearFieldError("newParkingSlots");
     if (!valid) return;
     void apiPost(`${API_BASE}/households`, {
       apartmentNo: newApartmentNo.trim(),
@@ -890,7 +910,6 @@ export default function Home() {
       ownerPhone: newOwnerPhone.trim(),
       emergencyContactName: newEmergencyName.trim(),
       emergencyContactPhone: newEmergencyPhone.trim(),
-      parkingSlots,
       moveInDate: newMoveInDate || undefined,
       ownershipStatus: newOwnershipStatus,
       contractEndDate: newContractEndDate || undefined,
@@ -905,7 +924,6 @@ export default function Home() {
     if (!editingHouseholdId) return;
     const floor = Number(newFloorNo);
     const area = Number(newAreaM2);
-    const parkingSlots = Number(newParkingSlots);
     void fetch(`${API_BASE}/households/${editingHouseholdId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -916,7 +934,6 @@ export default function Home() {
         ownerPhone: newOwnerPhone.trim(),
         emergencyContactName: newEmergencyName.trim(),
         emergencyContactPhone: newEmergencyPhone.trim(),
-        parkingSlots,
         moveInDate: newMoveInDate || null,
         ownershipStatus: newOwnershipStatus,
         contractEndDate: newContractEndDate || null,
@@ -1199,6 +1216,43 @@ export default function Home() {
     });
   }
 
+  async function createVehicle() {
+    if (!newVehicleHouseholdId || !newVehicleLicensePlate.trim()) return;
+    await apiPost(`${API_BASE}/vehicles`, {
+      householdId: newVehicleHouseholdId,
+      licensePlate: newVehicleLicensePlate.trim(),
+      type: newVehicleType,
+    }).then(async () => {
+      await refreshAllFromApi();
+      setNewVehicleLicensePlate("");
+    });
+  }
+
+  async function deleteVehicle(id: number) {
+    if (!confirm(l(lang, "Xác nhận xóa phương tiện?", "Confirm delete vehicle?"))) return;
+    await apiDelete(`${API_BASE}/vehicles/${id}`).then(async () => {
+      await refreshAllFromApi();
+    });
+  }
+
+  async function createVehicleLog() {
+    if (!logVehicleId) return;
+    await apiPost(`${API_BASE}/vehicle-logs`, {
+      vehicleId: logVehicleId,
+      direction: logDirection,
+      timestamp: logTimestamp || undefined,
+    }).then(async () => {
+      await refreshAllFromApi();
+    });
+  }
+
+  async function deleteVehicleLog(id: number) {
+    if (!confirm(l(lang, "Xác nhận xóa log?", "Confirm delete log?"))) return;
+    await apiDelete(`${API_BASE}/vehicle-logs/${id}`).then(async () => {
+      await refreshAllFromApi();
+    });
+  }
+
   function createObligation() {
     let valid = true;
     if (!newObligationPeriodId) { setFieldError("newObligationPeriodId", l(lang, "Bắt buộc", "Required")); valid = false; } else clearFieldError("newObligationPeriodId");
@@ -1321,12 +1375,24 @@ export default function Home() {
     void downloadFile(`${API_BASE}/reports/payments?${params.toString()}`, "payment_report.pdf");
   }
 
+  function downloadPaymentsXlsx() {
+    const params = new URLSearchParams();
+    params.set("format", "xlsx");
+    if (filterMonth !== "all") params.set("month", String(filterMonth));
+    if (filterYear !== "all") params.set("year", String(filterYear));
+    void downloadFile(`${API_BASE}/reports/payments?${params.toString()}`, "payment_report.xlsx");
+  }
+
   function downloadResidencyCsv() {
     void downloadFile(`${API_BASE}/reports/residency`, "residency_report.csv");
   }
 
   function downloadResidencyPdf() {
     void downloadFile(`${API_BASE}/reports/residency?format=pdf`, "residency_report.pdf");
+  }
+
+  function downloadResidencyXlsx() {
+    void downloadFile(`${API_BASE}/reports/residency?format=xlsx`, "residency_report.xlsx");
   }
 
   function downloadDebtSummaryCsv(householdId?: number) {
@@ -1340,6 +1406,13 @@ export default function Home() {
     params.set("format", "pdf");
     if (householdId) params.set("householdId", String(householdId));
     void downloadFile(`${API_BASE}/reports/debt-summary?${params.toString()}`, "debt_summary.pdf");
+  }
+
+  function downloadDebtSummaryXlsx(householdId?: number) {
+    const params = new URLSearchParams();
+    params.set("format", "xlsx");
+    if (householdId) params.set("householdId", String(householdId));
+    void downloadFile(`${API_BASE}/reports/debt-summary?${params.toString()}`, "debt_summary.xlsx");
   }
 
   function printPaymentReceipt(paymentId: number) {
@@ -1565,7 +1638,6 @@ export default function Home() {
                 <div><input className="input" value={newOwnerPhone} onChange={(e) => { setNewOwnerPhone(e.target.value); clearFieldError("newOwnerPhone"); }} placeholder={`${t(lang, "phone")} *`} />{fieldErrors.newOwnerPhone && <p className="field-error">{fieldErrors.newOwnerPhone}</p>}</div>
                 <input className="input" value={newEmergencyName} onChange={(e) => setNewEmergencyName(e.target.value)} placeholder={l(lang, "Người liên hệ khẩn", "Emergency contact")} />
                 <input className="input" value={newEmergencyPhone} onChange={(e) => setNewEmergencyPhone(e.target.value)} placeholder={l(lang, "SĐT khẩn", "Emergency phone")} />
-                <div><input className="input" value={newParkingSlots} onChange={(e) => { setNewParkingSlots(e.target.value); clearFieldError("newParkingSlots"); }} placeholder={l(lang, "Số chỗ xe", "Parking slots")} />{fieldErrors.newParkingSlots && <p className="field-error">{fieldErrors.newParkingSlots}</p>}</div>
                 <input className="input" type="date" value={newMoveInDate} onChange={(e) => setNewMoveInDate(e.target.value)} title={l(lang, "Ngày bắt đầu vào ở", "Move-in date")} />
                 <select className="input" value={newOwnershipStatus} onChange={(e) => setNewOwnershipStatus(e.target.value as "OWNER" | "TENANT")}>
                   <option value="OWNER">{l(lang, "Chủ sở hữu", "Owner")}</option>
@@ -1599,7 +1671,7 @@ export default function Home() {
 
               <div className="table-wrap mt-3">
                 <table>
-                  <thead><tr><th>{t(lang, "apartment")}</th><th>{t(lang, "owner")}</th><th>{l(lang, "Cư dân", "Residents")}</th><th>{l(lang, "Sở hữu", "Ownership")}</th><th>{l(lang, "Tầng", "Floor")}</th><th>{l(lang, "Diện tích", "Area")}</th><th>{l(lang, "Khẩn cấp", "Emergency")}</th><th>{l(lang, "Xe", "Parking")}</th><th>{l(lang, "Ngày vào", "Move-in")}</th><th>{l(lang, "Nhắc phí", "Remind")}</th></tr></thead>
+                  <thead><tr><th>{t(lang, "apartment")}</th><th>{t(lang, "owner")}</th><th>{l(lang, "Cư dân", "Residents")}</th><th>{l(lang, "Sở hữu", "Ownership")}</th><th>{l(lang, "Tầng", "Floor")}</th><th>{l(lang, "Diện tích", "Area")}</th><th>{l(lang, "Khẩn cấp", "Emergency")}</th><th>{l(lang, "Xe", "Vehicles")}</th><th>{l(lang, "Ngày vào", "Move-in")}</th><th>{l(lang, "Nhắc phí", "Remind")}</th></tr></thead>
                   <tbody>
                     {pagedHouseholds.map((h) => (
                       <tr key={h.id}>
@@ -1610,7 +1682,7 @@ export default function Home() {
                         <td>{h.floorNo}</td>
                         <td>{h.areaM2}</td>
                         <td>{h.emergencyContactName || "-"} {h.emergencyContactPhone ? `(${h.emergencyContactPhone})` : ""}</td>
-                        <td>{h.parkingSlots ?? 0}</td>
+                        <td>{vehicles.filter((v) => v.householdId === h.id).length}</td>
                         <td>{h.moveInDate ? new Date(h.moveInDate).toLocaleDateString("vi-VN") : "-"}</td>
                         <td>
                           <div className="flex gap-2">
@@ -1624,7 +1696,6 @@ export default function Home() {
                               setNewOwnerPhone(h.ownerPhone);
                               setNewEmergencyName(h.emergencyContactName ?? "");
                               setNewEmergencyPhone(h.emergencyContactPhone ?? "");
-                              setNewParkingSlots(String(h.parkingSlots ?? 0));
                               setNewMoveInDate(h.moveInDate ? h.moveInDate.slice(0, 10) : "");
                               setNewOwnershipStatus(h.ownershipStatus ?? "OWNER");
                               setNewContractEndDate(h.contractEndDate ? h.contractEndDate.slice(0, 10) : "");
@@ -1886,10 +1957,7 @@ export default function Home() {
               </div>
               <div className="grid gap-2 mt-2 md:grid-cols-3">
                 <div>
-                  <select className="input" value={collectorName} onChange={(e) => { setCollectorName(e.target.value); clearFieldError("collectorName"); }}>
-                    <option value="">{l(lang, "Chọn người thu *", "Select collector *")}</option>
-                    {collectorOptions.map((x) => <option key={x} value={x}>{x}</option>)}
-                  </select>
+                  <input className="input" value={collectorName} readOnly placeholder={l(lang, "Người thu", "Collector")} />
                   {fieldErrors.collectorName && <p className="field-error">{fieldErrors.collectorName}</p>}
                 </div>
                 <select className="input" value={payerName} onChange={(e) => setPayerName(e.target.value)}>
@@ -1960,7 +2028,6 @@ export default function Home() {
                       <button className="btn-secondary" onClick={() => {
                         setEditingPaymentId(p.id);
                         setPaymentMethod(p.method);
-                        setCollectorName(p.collectorName);
                         setPayerName(p.payerName ?? "");
                         setPayerPhone(p.payerPhone ?? "");
                         setBankTxRef(p.bankTxRef ?? "");
@@ -1969,7 +2036,7 @@ export default function Home() {
                         setPaymentNote(p.note);
                       }}>{l(lang, "Sửa", "Edit")}</button>
                       <button className="btn-secondary" onClick={() => printPaymentReceipt(p.id)}>{l(lang, "In biên lai", "Print receipt")}</button>
-                      <button className="btn-danger" onClick={() => deletePayment(p.id)}>{l(lang, "Xóa", "Delete")}</button>
+                      <button className="btn-danger" onClick={() => deletePayment(p.id)} style={{ display: user?.role === "ADMIN" ? undefined : "none" }}>{l(lang, "Xóa", "Delete")}</button>
                     </div>
                   </article>
                 ))}
@@ -2111,6 +2178,146 @@ export default function Home() {
                 <button className="btn-secondary" disabled={pageEvents <= 1} onClick={() => setPageEvents((p) => Math.max(1, p - 1))}>{l(lang, "Trước", "Prev")}</button>
                 <button className="btn-secondary" disabled={pageEvents * pageSize >= filteredEvents.length} onClick={() => setPageEvents((p) => p + 1)}>{l(lang, "Sau", "Next")}</button>
                 <span className="muted">{l(lang, "Trang", "Page")} {pageEvents}/{totalEventPages}</span>
+              </div>
+            </section>
+          )}
+
+          {tab === "vehicles" && (
+            <section className="card">
+              <h2 className="subtitle">{t(lang, "vehicles")}</h2>
+
+              {canPermission(user, "VEHICLE", "LOG") && (
+                <div className="card mt-3">
+                  <h3 className="subtitle">{l(lang, "Ghi nhận xe ra/vào", "Log vehicle entry/exit")}</h3>
+                  <div className="grid gap-2" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                    <label>
+                      {l(lang, "Hộ khẩu", "Household")}
+                      <select className="input" value={logSelectedHouseholdId} onChange={(e) => {
+                        const hhId = Number(e.target.value);
+                        setLogSelectedHouseholdId(hhId);
+                        setLogVehicleId(0);
+                      }}>
+                        <option value={0}>{l(lang, "Chọn hộ khẩu", "Select household")}</option>
+                        {households.map((h) => (
+                          <option key={h.id} value={h.id}>{h.apartmentNo} - {h.ownerName}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      {l(lang, "Phương tiện", "Vehicle")}
+                      <select className="input" value={logVehicleId} onChange={(e) => setLogVehicleId(Number(e.target.value))}>
+                        <option value={0}>{l(lang, "Chọn phương tiện", "Select vehicle")}</option>
+                        {vehicles.filter((v) => v.householdId === logSelectedHouseholdId).map((v) => (
+                          <option key={v.id} value={v.id}>{v.licensePlate} ({v.vehicleType})</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      {l(lang, "Hướng", "Direction")}
+                      <select className="input" value={logDirection} onChange={(e) => setLogDirection(e.target.value as VehicleLogDirection)}>
+                        <option value="IN">{l(lang, "Vào", "In")}</option>
+                        <option value="OUT">{l(lang, "Ra", "Out")}</option>
+                      </select>
+                    </label>
+                    <label>
+                      {l(lang, "Thời gian", "Timestamp")}
+                      <input className="input" type="datetime-local" value={logTimestamp} onChange={(e) => setLogTimestamp(e.target.value)} />
+                    </label>
+                  </div>
+                  <button className="btn-primary mt-2" disabled={!logVehicleId} onClick={createVehicleLog}>
+                    {l(lang, "Ghi nhận", "Log")}
+                  </button>
+                </div>
+              )}
+
+              {canPermission(user, "VEHICLE", "WRITE") && (
+                <div className="card mt-3">
+                  <h3 className="subtitle">{l(lang, "Thêm phương tiện", "Add vehicle")}</h3>
+                  <div className="grid gap-2" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                    <select className="input" value={newVehicleHouseholdId} onChange={(e) => setNewVehicleHouseholdId(Number(e.target.value))}>
+                      <option value={0}>{l(lang, "Chọn hộ khẩu", "Select household")}</option>
+                      {households.map((h) => (
+                        <option key={h.id} value={h.id}>{h.apartmentNo} - {h.ownerName}</option>
+                      ))}
+                    </select>
+                    <input className="input" placeholder={l(lang, "Biển số", "License plate")} value={newVehicleLicensePlate} onChange={(e) => setNewVehicleLicensePlate(e.target.value)} />
+                    <select className="input" value={newVehicleType} onChange={(e) => setNewVehicleType(e.target.value as VehicleType)}>
+                      <option value="CAR">{l(lang, "Ô tô", "Car")}</option>
+                      <option value="MOTORBIKE">{l(lang, "Xe máy", "Motorcycle")}</option>
+                      <option value="BICYCLE">{l(lang, "Xe đạp", "Bicycle")}</option>
+                      <option value="OTHER">{l(lang, "Khác", "Other")}</option>
+                    </select>
+                  </div>
+                  <button className="btn-primary mt-2" disabled={!newVehicleHouseholdId || !newVehicleLicensePlate.trim()} onClick={createVehicle}>
+                    {l(lang, "Thêm", "Add")}
+                  </button>
+                </div>
+              )}
+
+              <div className="card mt-3">
+                <h3 className="subtitle">{l(lang, "Danh sách phương tiện", "Vehicle list")}</h3>
+                <div className="table-wrap">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>{l(lang, "Hộ khẩu", "Household")}</th>
+                        <th>{l(lang, "Biển số", "License plate")}</th>
+                        <th>{l(lang, "Loại", "Type")}</th>
+                        {canPermission(user, "VEHICLE", "WRITE") && <th>{l(lang, "Xóa", "Remove")}</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vehicles.length === 0 && (
+                        <tr><td colSpan={canPermission(user, "VEHICLE", "WRITE") ? 5 : 4} className="text-center muted">{l(lang, "Không có dữ liệu", "No data")}</td></tr>
+                      )}
+                      {vehicles.map((v, i) => (
+                        <tr key={v.id}>
+                          <td>{i + 1}</td>
+                          <td>{householdById.get(v.householdId)?.apartmentNo ?? v.householdId}</td>
+                          <td>{v.licensePlate}</td>
+                          <td>{v.vehicleType}</td>
+                          {canPermission(user, "VEHICLE", "WRITE") && (
+                            <td><button className="btn-danger btn-sm" onClick={() => deleteVehicle(v.id)}>{l(lang, "Xóa", "Delete")}</button></td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="card mt-3">
+                <h3 className="subtitle">{l(lang, "Lịch sử ra/vào", "Entry/exit log")}</h3>
+                <div className="table-wrap">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>{l(lang, "Phương tiện", "Vehicle")}</th>
+                        <th>{l(lang, "Hướng", "Direction")}</th>
+                        <th>{l(lang, "Thời gian", "Timestamp")}</th>
+                        {canPermission(user, "VEHICLE", "WRITE") && <th>{l(lang, "Xóa", "Delete")}</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vehicleLogs.length === 0 && (
+                        <tr><td colSpan={canPermission(user, "VEHICLE", "WRITE") ? 5 : 4} className="text-center muted">{l(lang, "Không có dữ liệu", "No data")}</td></tr>
+                      )}
+                      {vehicleLogs.toReversed().slice(0, 50).map((vl, i) => (
+                        <tr key={vl.id}>
+                          <td>{i + 1}</td>
+                          <td>{vehicles.find((v) => v.id === vl.vehicleId)?.licensePlate ?? vl.vehicleId}</td>
+                          <td>{vl.direction === "IN" ? l(lang, "Vào", "In") : l(lang, "Ra", "Out")}</td>
+                          <td>{new Date(vl.timestamp).toLocaleString()}</td>
+                          {canPermission(user, "VEHICLE", "WRITE") && (
+                            <td><button className="btn-danger btn-sm" onClick={() => deleteVehicleLog(vl.id)}>{l(lang, "Xóa", "Delete")}</button></td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </section>
           )}
@@ -2270,13 +2477,16 @@ export default function Home() {
           {tab === "reports" && (
             <section className="card">
               <h2 className="subtitle">{t(lang, "reports")}</h2>
-              <div className="flex gap-2 mt-2">
+              <div className="flex gap-2 mt-2 flex-wrap">
                 <button className="btn-secondary" onClick={downloadPaymentsCsv}>{l(lang, "Xuất thu phí CSV", "Export payments CSV")}</button>
                 <button className="btn-secondary" onClick={downloadPaymentsPdf}>{l(lang, "Xuất thu phí PDF", "Export payments PDF")}</button>
+                <button className="btn-secondary" onClick={downloadPaymentsXlsx}>{l(lang, "Xuất thu phí Excel", "Export payments Excel")}</button>
                 <button className="btn-secondary" onClick={downloadResidencyCsv}>{l(lang, "Xuất cư trú CSV", "Export residency CSV")}</button>
                 <button className="btn-secondary" onClick={downloadResidencyPdf}>{l(lang, "Xuất cư trú PDF", "Export residency PDF")}</button>
+                <button className="btn-secondary" onClick={downloadResidencyXlsx}>{l(lang, "Xuất cư trú Excel", "Export residency Excel")}</button>
                 <button className="btn-secondary" onClick={() => downloadDebtSummaryCsv()}>{l(lang, "Xuất công nợ CSV", "Export debt CSV")}</button>
                 <button className="btn-secondary" onClick={() => downloadDebtSummaryPdf()}>{l(lang, "Xuất công nợ PDF", "Export debt PDF")}</button>
+                <button className="btn-secondary" onClick={() => downloadDebtSummaryXlsx()}>{l(lang, "Xuất công nợ Excel", "Export debt Excel")}</button>
               </div>
               <div className="grid gap-4 md:grid-cols-2 mt-3">
                 <BarChart title={l(lang, "Tỉ lệ thu theo từng tháng (%)", "Collection rate by month (%)")} data={(analytics?.collectionByMonth ?? []).map((x) => ({ label: x.label, value: x.rate }))} color="linear-gradient(90deg,#2b8a3e,#46b95e)" maxBars={8} />
@@ -2491,7 +2701,7 @@ export default function Home() {
               <button className="btn-secondary" onClick={() => setInspectHouseholdId(null)}>{l(lang, "Đóng", "Close")}</button>
             </div>
             <p className="muted mt-2">{l(lang, "Chủ hộ", "Owner")}: {inspectedHousehold.hh.ownerName} ({inspectedHousehold.hh.ownerPhone})</p>
-            <p className="muted">{l(lang, "Số xe đăng ký", "Registered vehicles/slots")}: {inspectedHousehold.hh.parkingSlots ?? 0}</p>
+            <p className="muted">{l(lang, "Số xe đăng ký", "Registered vehicles")}: {vehicles.filter((v) => v.householdId === inspectedHousehold.hh.id).length}</p>
             <p className="muted">{l(lang, "Tổng nợ hiện tại", "Current outstanding debt")}: {formatVnd(inspectedHousehold.hhDebt)}</p>
             <h4 className="subtitle mt-3">{l(lang, "Người trong hộ", "Residents")}</h4>
             {inspectedHousehold.hhResidents.length === 0 ? <p className="muted">{l(lang, "Chưa có cư dân", "No residents")}</p> : inspectedHousehold.hhResidents.map((r) => <p key={r.id} className="muted">- {r.fullName} ({r.residentType})</p>)}

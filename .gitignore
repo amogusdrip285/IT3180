@@ -1,0 +1,14 @@
+# Added by code-review-graph
+.code-review-graph/
+
+# Node
+node_modules/
+.next/
+
+# Database
+*.db
+*.db-journal
+
+# Environment
+.env
+.env.local
