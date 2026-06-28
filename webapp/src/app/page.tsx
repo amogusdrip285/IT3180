@@ -137,7 +137,7 @@ export default function Home() {
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserPhone, setNewUserPhone] = useState("");
   const [newUserFullName, setNewUserFullName] = useState("");
-  const [newUserRole, setNewUserRole] = useState<"ADMIN" | "ACCOUNTANT" | "TEAM_LEADER">("ACCOUNTANT");
+  const [newUserRole, setNewUserRole] = useState("ACCOUNTANT");
   const [newUserPassword, setNewUserPassword] = useState("");
   const [editingHouseholdId, setEditingHouseholdId] = useState<number | null>(null);
   const [editingResidentId, setEditingResidentId] = useState<number | null>(null);
@@ -149,6 +149,7 @@ export default function Home() {
   const [inspectHouseholdId, setInspectHouseholdId] = useState<number | null>(null);
   const [newRoleCode, setNewRoleCode] = useState("");
   const [newRoleName, setNewRoleName] = useState("");
+  const [newRolePermissionIds, setNewRolePermissionIds] = useState<number[]>([]);
   const [newPermCode, setNewPermCode] = useState("");
   const [newPermName, setNewPermName] = useState("");
   const [newPermModule, setNewPermModule] = useState("");
@@ -190,7 +191,7 @@ export default function Home() {
   const [filterEventType, setFilterEventType] = useState<"all" | "TEMP_RESIDENCE" | "TEMP_ABSENCE" | "MOVE_IN" | "MOVE_OUT">("all");
   const [filterEventResidentId, setFilterEventResidentId] = useState<number | "all">("all");
   const [filterUserQuery, setFilterUserQuery] = useState("");
-  const [filterUserRole, setFilterUserRole] = useState<"all" | "ADMIN" | "ACCOUNTANT" | "TEAM_LEADER">("all");
+  const [filterUserRole, setFilterUserRole] = useState<"all" | "ADMIN" | "ACCOUNTANT" | "TEAM_LEADER" | "GUARD">("all");
   const [filterUserStatus, setFilterUserStatus] = useState<"all" | "ACTIVE" | "BLOCKED">("all");
   const [inspectHouseholdSearch, setInspectHouseholdSearch] = useState("");
   const [filterPaymentCollector, setFilterPaymentCollector] = useState("");
@@ -725,6 +726,12 @@ export default function Home() {
     if (!residentPayerOptions.includes(payerName)) setPayerName("");
   }, [residentPayerOptions, payerName]);
 
+  useEffect(() => {
+    if (!payerName) { setPayerPhone(""); return; }
+    const resident = residents.find((r) => r.fullName === payerName && r.householdId === (selectedObligation?.householdId ?? -1));
+    if (resident?.phone) setPayerPhone(resident.phone);
+  }, [payerName, residents, selectedObligation]);
+
   const years = Array.from(new Set(periods.map((p) => p.year))).sort();
 
   function login(formData: FormData) {
@@ -847,8 +854,11 @@ export default function Home() {
     if (!newRoleCode.trim()) { setFieldError("newRoleCode", l(lang, "Bắt buộc", "Required")); valid = false; } else clearFieldError("newRoleCode");
     if (!newRoleName.trim()) { setFieldError("newRoleName", l(lang, "Bắt buộc", "Required")); valid = false; } else clearFieldError("newRoleName");
     if (!valid) return;
-    void apiPost(`${API_BASE}/roles`, { code: newRoleCode, name: newRoleName }).then(async () => {
+    void apiPost(`${API_BASE}/roles`, { code: newRoleCode, name: newRoleName, permissionIds: newRolePermissionIds }).then(async () => {
       await refreshAllFromApi();
+      setNewRoleCode("");
+      setNewRoleName("");
+      setNewRolePermissionIds([]);
     });
   }
 
@@ -899,8 +909,8 @@ export default function Home() {
     let valid = true;
     if (!newApartmentNo.trim()) { setFieldError("newApartmentNo", l(lang, "Bắt buộc", "Required")); valid = false; } else clearFieldError("newApartmentNo");
     if (!Number.isFinite(floor)) { setFieldError("newFloorNo", l(lang, "Tầng không hợp lệ", "Invalid floor")); valid = false; } else clearFieldError("newFloorNo");
-    if (!newOwnerName.trim()) { setFieldError("newOwnerName", l(lang, "Bắt buộc", "Required")); valid = false; } else clearFieldError("newOwnerName");
-    if (!newOwnerPhone.trim()) { setFieldError("newOwnerPhone", l(lang, "Bắt buộc", "Required")); valid = false; } else clearFieldError("newOwnerPhone");
+    clearFieldError("newOwnerName");
+    clearFieldError("newOwnerPhone");
     if (!Number.isFinite(area) || area <= 0) { setFieldError("newAreaM2", l(lang, "Diện tích không hợp lệ", "Invalid area")); valid = false; } else clearFieldError("newAreaM2");
     if (!valid) return;
     void apiPost(`${API_BASE}/households`, {
@@ -1221,7 +1231,7 @@ export default function Home() {
     await apiPost(`${API_BASE}/vehicles`, {
       householdId: newVehicleHouseholdId,
       licensePlate: newVehicleLicensePlate.trim(),
-      type: newVehicleType,
+      vehicleType: newVehicleType,
     }).then(async () => {
       await refreshAllFromApi();
       setNewVehicleLicensePlate("");
@@ -1417,6 +1427,10 @@ export default function Home() {
 
   function printPaymentReceipt(paymentId: number) {
     void downloadFile(`${API_BASE}/payments/${paymentId}/receipt`, `payment_receipt_${paymentId}.pdf`);
+  }
+
+  function downloadReceiptXlsx(paymentId: number) {
+    void downloadFile(`${API_BASE}/payments/${paymentId}/receipt?format=xlsx`, `payment_receipt_${paymentId}.xlsx`);
   }
 
   async function downloadFile(url: string, fallbackName: string) {
@@ -1634,8 +1648,8 @@ export default function Home() {
               <div className="grid gap-2 mt-3 md:grid-cols-4">
                 <div><input className="input" value={newApartmentNo} onChange={(e) => { setNewApartmentNo(e.target.value); clearFieldError("newApartmentNo"); }} placeholder={`${t(lang, "apartment")} *`} />{fieldErrors.newApartmentNo && <p className="field-error">{fieldErrors.newApartmentNo}</p>}</div>
                 <div><input className="input" value={newFloorNo} onChange={(e) => { setNewFloorNo(e.target.value); clearFieldError("newFloorNo"); }} placeholder={`${t(lang, "floor")} *`} />{fieldErrors.newFloorNo && <p className="field-error">{fieldErrors.newFloorNo}</p>}</div>
-                <div><input className="input" value={newOwnerName} onChange={(e) => { setNewOwnerName(e.target.value); clearFieldError("newOwnerName"); }} placeholder={`${t(lang, "owner")} *`} />{fieldErrors.newOwnerName && <p className="field-error">{fieldErrors.newOwnerName}</p>}</div>
-                <div><input className="input" value={newOwnerPhone} onChange={(e) => { setNewOwnerPhone(e.target.value); clearFieldError("newOwnerPhone"); }} placeholder={`${t(lang, "phone")} *`} />{fieldErrors.newOwnerPhone && <p className="field-error">{fieldErrors.newOwnerPhone}</p>}</div>
+                <div><input className="input" value={newOwnerName} onChange={(e) => { setNewOwnerName(e.target.value); clearFieldError("newOwnerName"); }} placeholder={t(lang, "owner")} />{fieldErrors.newOwnerName && <p className="field-error">{fieldErrors.newOwnerName}</p>}</div>
+                <div><input className="input" value={newOwnerPhone} onChange={(e) => { setNewOwnerPhone(e.target.value); clearFieldError("newOwnerPhone"); }} placeholder={t(lang, "phone")} />{fieldErrors.newOwnerPhone && <p className="field-error">{fieldErrors.newOwnerPhone}</p>}</div>
                 <input className="input" value={newEmergencyName} onChange={(e) => setNewEmergencyName(e.target.value)} placeholder={l(lang, "Người liên hệ khẩn", "Emergency contact")} />
                 <input className="input" value={newEmergencyPhone} onChange={(e) => setNewEmergencyPhone(e.target.value)} placeholder={l(lang, "SĐT khẩn", "Emergency phone")} />
                 <input className="input" type="date" value={newMoveInDate} onChange={(e) => setNewMoveInDate(e.target.value)} title={l(lang, "Ngày bắt đầu vào ở", "Move-in date")} />
@@ -2036,6 +2050,7 @@ export default function Home() {
                         setPaymentNote(p.note);
                       }}>{l(lang, "Sửa", "Edit")}</button>
                       <button className="btn-secondary" onClick={() => printPaymentReceipt(p.id)}>{l(lang, "In biên lai", "Print receipt")}</button>
+                      <button className="btn-secondary" onClick={() => downloadReceiptXlsx(p.id)}>{l(lang, "Xuất Excel", "Export Excel")}</button>
                       <button className="btn-danger" onClick={() => deletePayment(p.id)} style={{ display: user?.role === "ADMIN" ? undefined : "none" }}>{l(lang, "Xóa", "Delete")}</button>
                     </div>
                   </article>
@@ -2345,7 +2360,9 @@ export default function Home() {
                       <div><input className="input" value={newUserEmail} onChange={(e) => { setNewUserEmail(e.target.value); clearFieldError("newUserEmail"); }} placeholder={`${t(lang, "email")} *`} />{fieldErrors.newUserEmail && <p className="field-error">{fieldErrors.newUserEmail}</p>}</div>
                       <div><input className="input" value={newUserPhone} onChange={(e) => { setNewUserPhone(e.target.value); clearFieldError("newUserPhone"); }} placeholder={`${t(lang, "phone")} *`} />{fieldErrors.newUserPhone && <p className="field-error">{fieldErrors.newUserPhone}</p>}</div>
                       <div><input className="input" value={newUserFullName} onChange={(e) => { setNewUserFullName(e.target.value); clearFieldError("newUserFullName"); }} placeholder={`${t(lang, "fullName")} *`} />{fieldErrors.newUserFullName && <p className="field-error">{fieldErrors.newUserFullName}</p>}</div>
-                      <select className="input" value={newUserRole} onChange={(e) => setNewUserRole(e.target.value as "ADMIN" | "ACCOUNTANT" | "TEAM_LEADER")}><option value="ADMIN">{t(lang, "roleAdmin")}</option><option value="ACCOUNTANT">{t(lang, "roleAccountant")}</option><option value="TEAM_LEADER">{t(lang, "roleLeader")}</option></select>
+                      <select className="input" value={newUserRole} onChange={(e) => setNewUserRole(e.target.value)}>
+                        {roles.map((r) => <option key={r.id} value={r.code}>{r.name}</option>)}
+                      </select>
                       <div><input className="input" value={newUserPassword} onChange={(e) => { setNewUserPassword(e.target.value); clearFieldError("newUserPassword"); }} placeholder={`${t(lang, "newPassword")} *`} />{fieldErrors.newUserPassword && <p className="field-error">{fieldErrors.newUserPassword}</p>}</div>
                     </div>
                     <button className="btn-primary mt-2" onClick={createUser}>{t(lang, "create")}</button>
@@ -2367,6 +2384,14 @@ export default function Home() {
                       <div><input className="input" value={newRoleCode} onChange={(e) => { setNewRoleCode(e.target.value.toUpperCase()); clearFieldError("newRoleCode"); }} placeholder={`${l(lang, "Mã vai trò", "Role code")} *`} />{fieldErrors.newRoleCode && <p className="field-error">{fieldErrors.newRoleCode}</p>}</div>
                       <div><input className="input" value={newRoleName} onChange={(e) => { setNewRoleName(e.target.value); clearFieldError("newRoleName"); }} placeholder={`${l(lang, "Tên vai trò", "Role name")} *`} />{fieldErrors.newRoleName && <p className="field-error">{fieldErrors.newRoleName}</p>}</div>
                       <button className="btn-secondary" onClick={createRole}>{l(lang, "Tạo vai trò", "Create role")}</button>
+                    </div>
+                    <div className="mt-2">
+                      <p className="muted">{l(lang, "Gán quyền cho vai trò mới", "Assign permissions to new role")}</p>
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        {permissionItems.map((p) => (
+                          <button key={p.id} className={`btn-chip ${newRolePermissionIds.includes(p.id) ? "active" : ""}`} onClick={() => setNewRolePermissionIds((prev) => prev.includes(p.id) ? prev.filter((x) => x !== p.id) : [...prev, p.id])}>{p.code}</button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
@@ -2453,11 +2478,12 @@ export default function Home() {
                 <h3 className="subtitle">{l(lang, "Bộ lọc người dùng", "User filters")}</h3>
                 <div className="grid gap-2 mt-2 md:grid-cols-2">
                   <input className="input" value={filterUserQuery} onChange={(e) => setFilterUserQuery(e.target.value)} placeholder={l(lang, "Lọc người dùng theo tài khoản/tên/vai trò", "Filter users by username/name/role")} />
-                  <select className="input" value={filterUserRole} onChange={(e) => setFilterUserRole(e.target.value as "all" | "ADMIN" | "ACCOUNTANT" | "TEAM_LEADER")}>
+                  <select className="input" value={filterUserRole} onChange={(e) => setFilterUserRole(e.target.value as "all" | "ADMIN" | "ACCOUNTANT" | "TEAM_LEADER" | "GUARD")}>
                     <option value="all">{l(lang, "Mọi vai trò", "All roles")}</option>
                     <option value="ADMIN">{t(lang, "roleAdmin")}</option>
                     <option value="ACCOUNTANT">{t(lang, "roleAccountant")}</option>
                     <option value="TEAM_LEADER">{t(lang, "roleLeader")}</option>
+                    <option value="GUARD">{t(lang, "roleGuard")}</option>
                   </select>
                   <select className="input" value={filterUserStatus} onChange={(e) => setFilterUserStatus(e.target.value as "all" | "ACTIVE" | "BLOCKED")}>
                     <option value="all">{l(lang, "Mọi trạng thái", "All statuses")}</option>
@@ -2478,15 +2504,12 @@ export default function Home() {
             <section className="card">
               <h2 className="subtitle">{t(lang, "reports")}</h2>
               <div className="flex gap-2 mt-2 flex-wrap">
-                <button className="btn-secondary" onClick={downloadPaymentsCsv}>{l(lang, "Xuất thu phí CSV", "Export payments CSV")}</button>
+                <button className="btn-primary" onClick={downloadPaymentsXlsx}>{l(lang, "Xuất thu phí Excel", "Export payments Excel")}</button>
+                <button className="btn-primary" onClick={downloadResidencyXlsx}>{l(lang, "Xuất cư trú Excel", "Export residency Excel")}</button>
+                <button className="btn-primary" onClick={() => downloadDebtSummaryXlsx()}>{l(lang, "Xuất công nợ Excel", "Export debt Excel")}</button>
                 <button className="btn-secondary" onClick={downloadPaymentsPdf}>{l(lang, "Xuất thu phí PDF", "Export payments PDF")}</button>
-                <button className="btn-secondary" onClick={downloadPaymentsXlsx}>{l(lang, "Xuất thu phí Excel", "Export payments Excel")}</button>
-                <button className="btn-secondary" onClick={downloadResidencyCsv}>{l(lang, "Xuất cư trú CSV", "Export residency CSV")}</button>
                 <button className="btn-secondary" onClick={downloadResidencyPdf}>{l(lang, "Xuất cư trú PDF", "Export residency PDF")}</button>
-                <button className="btn-secondary" onClick={downloadResidencyXlsx}>{l(lang, "Xuất cư trú Excel", "Export residency Excel")}</button>
-                <button className="btn-secondary" onClick={() => downloadDebtSummaryCsv()}>{l(lang, "Xuất công nợ CSV", "Export debt CSV")}</button>
                 <button className="btn-secondary" onClick={() => downloadDebtSummaryPdf()}>{l(lang, "Xuất công nợ PDF", "Export debt PDF")}</button>
-                <button className="btn-secondary" onClick={() => downloadDebtSummaryXlsx()}>{l(lang, "Xuất công nợ Excel", "Export debt Excel")}</button>
               </div>
               <div className="grid gap-4 md:grid-cols-2 mt-3">
                 <BarChart title={l(lang, "Tỉ lệ thu theo từng tháng (%)", "Collection rate by month (%)")} data={(analytics?.collectionByMonth ?? []).map((x) => ({ label: x.label, value: x.rate }))} color="linear-gradient(90deg,#2b8a3e,#46b95e)" maxBars={8} />

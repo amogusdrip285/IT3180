@@ -25,10 +25,19 @@ export async function POST(req: NextRequest) {
   const deny = requirePermission(auth.user!, "SYSTEM", "ADMIN");
   if (deny) return deny;
 
-  const body = (await req.json()) as { code: string; name: string; description?: string };
+  const body = (await req.json()) as { code: string; name: string; description?: string; permissionIds?: number[] };
   if (!body.code || !/^[A-Z0-9_]{3,50}$/.test(body.code)) return apiError("VALIDATION_ERROR", "Invalid role code", 400, { field: "code" });
   if (!body.name) return apiError("VALIDATION_ERROR", "Missing role name", 400, { field: "name" });
 
-  const row = await db.appRole.create({ data: { code: body.code, name: body.name, description: body.description ?? "" } });
+  const row = await db.appRole.create({
+    data: {
+      code: body.code,
+      name: body.name,
+      description: body.description ?? "",
+      permissions: body.permissionIds?.length
+        ? { create: body.permissionIds.map((pid) => ({ permissionId: pid })) }
+        : undefined,
+    },
+  });
   return NextResponse.json(row);
 }

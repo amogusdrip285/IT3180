@@ -35,14 +35,14 @@ export async function POST(req: NextRequest) {
   };
   const floorNo = toSafeInt(body.floorNo);
   const area = toSafeNumber(body.areaM2);
-  if (!body.apartmentNo || !floorNo || !body.ownerName || !body.ownerPhone || !area || area <= 0) {
+  if (!body.apartmentNo || !floorNo || !area || area <= 0) {
     return apiError("VALIDATION_ERROR", "Invalid household payload", 400);
   }
   const existingApartment = await db.household.findUnique({ where: { apartmentNo: body.apartmentNo } });
   if (existingApartment) {
     return apiError("DUPLICATE_DATA", "Apartment number already exists", 409, { field: "apartmentNo" });
   }
-  if (!isPhone(body.ownerPhone)) {
+  if (body.ownerPhone && !isPhone(body.ownerPhone)) {
     return apiError("VALIDATION_ERROR", "Invalid owner phone format", 400, { field: "ownerPhone" });
   }
   if (body.emergencyContactPhone && !isPhone(body.emergencyContactPhone)) {

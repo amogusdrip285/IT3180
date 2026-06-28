@@ -38,6 +38,16 @@ export async function POST(req: NextRequest) {
     return apiError("VALIDATION_ERROR", "Missing required fields", 400);
   }
 
+  if (body.direction === "IN") {
+    const lastLog = await db.vehicleLog.findFirst({
+      where: { vehicleId: body.vehicleId },
+      orderBy: { timestamp: "desc" },
+    });
+    if (lastLog && lastLog.direction === "IN") {
+      return apiError("VEHICLE_ALREADY_INSIDE", "Vehicle is already inside. Must exit first.", 409);
+    }
+  }
+
   const row = await db.vehicleLog.create({
     data: {
       vehicleId: body.vehicleId,

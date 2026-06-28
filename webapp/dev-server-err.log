@@ -1,0 +1,337 @@
+⨯ Error [PrismaClientKnownRequestError]: 
+Invalid `{imported module ./src/lib/db.ts}["db"].appRole.create()` invocation in
+D:\Hust\Nhập môn công nghệ phần mềm\Project\IT3180\webapp\.next\dev\server\chunks\[root-of-the-server]__0qb88fq._.js:244:152
+
+  241 if (!body.name) return (0, {imported module ./src/lib/errors.ts}["apiError"])("VALIDATION_ERROR", "Missing role name", 400, {
+  242     field: "name"
+  243 });
+→ 244 const row = await {imported module ./src/lib/db.ts}["db"].appRole.create(
+Unique constraint failed on the fields: (`code`)
+    at <unknown> (src\app\api\roles\route.ts:32:32)
+    at async POST (src\app\api\roles\route.ts:32:15)
+  30 |   if (!body.name) return apiError("VALIDATION_ERROR", "Missing role name", 400, { field: "...
+  31 |
+> 32 |   const row = await db.appRole.create({ data: { code: body.code, name: body.name, descript...
+     |                                ^
+  33 |   return NextResponse.json(row);
+  34 | }
+  35 | {
+  code: 'P2002',
+  meta: { modelName: 'AppRole', target: [ 'code' ] },
+  clientVersion: '6.19.3'
+}
+[browser] ⨯ unhandledRejection: Error: POST /api/roles failed
+    at apiPost (file://D:/Hust/Nhập môn công nghệ phần mềm/Project/IT3180/webapp/.next/dev/static/chunks/src_03b8vxz._.js:1745:15)
+[browser] ⨯ unhandledRejection: Error: Vehicle is already inside. Must exit first.
+    at apiPost (file://D:/Hust/Nhập môn công nghệ phần mềm/Project/IT3180/webapp/.next/dev/static/chunks/src_03b8vxz._.js:1745:15)
+    at async createVehicleLog (file://D:/Hust/Nhập môn công nghệ phần mềm/Project/IT3180/webapp/.next/dev/static/chunks/src_03b8vxz._.js?id=%255Bproject%255D%252Fsrc%252Fapp%252Fpage.tsx+%255Bapp-client%255D+%2528ecmascript%2529:1784:9)
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new Promise (<anonymous>)
+    at makeReceiptPdf (src\lib\pdf.ts:74:33)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  72 |   const page = pdf.addPage([595.28, 841.89]);
+  73 |   const { regular: fontRegularBytes, bold: fontBoldBytes } = await getFontBytes();
+> 74 |   const fontRegular = await pdf.embedFont(fontRegularBytes);
+     |                                 ^
+  75 |   const fontBold = fontRegular;
+  76 |
+  77 |   const margin = 36;
+⨯ TypeError: {imported module ./nodemodules/pdf-lib/es/api/PDFDocument.js}.PDFDocument.registerFontkit is not a function
+    at module evaluation (src\lib\pdf.ts:6:13)
+    at module evaluation (src\app\api\payments\[id]\receipt\route.ts:5:1)
+    at Object.<anonymous> (D:\Hust\Nhập môn công nghệ phần mềm\Project\IT3180\webapp\.next\dev\server\app\api\payments\[id]\receipt\route.js:19:3)
+  4 | import * as path from "path";
+  5 |
+> 6 | PDFDocument.registerFontkit(fontkit);
+    |             ^
+  7 |
+  8 | export interface TableRow {
+  9 |   label: string; {
+  page: '/api/payments/7163/receipt'
+}
+⨯ TypeError: {imported module ./nodemodules/pdf-lib/es/api/PDFDocument.js}.PDFDocument.registerFontkit is not a function
+    at module evaluation (src\lib\pdf.ts:6:13)
+    at module evaluation (src\app\api\payments\[id]\receipt\route.ts:5:1)
+    at Object.<anonymous> (D:\Hust\Nhập môn công nghệ phần mềm\Project\IT3180\webapp\.next\dev\server\app\api\payments\[id]\receipt\route.js:19:3)
+  4 | import * as path from "path";
+  5 |
+> 6 | PDFDocument.registerFontkit(fontkit);
+    |             ^
+  7 |
+  8 | export interface TableRow {
+  9 |   label: string; {
+  page: '/api/payments/7163/receipt'
+}
+⨯ TypeError: {imported module ./nodemodules/pdf-lib/es/api/PDFDocument.js}.PDFDocument.registerFontkit is not a function
+    at module evaluation (src\lib\pdf.ts:6:13)
+    at module evaluation (src\app\api\payments\[id]\receipt\route.ts:5:1)
+    at Object.<anonymous> (D:\Hust\Nhập môn công nghệ phần mềm\Project\IT3180\webapp\.next\dev\server\app\api\payments\[id]\receipt\route.js:19:3)
+  4 | import * as path from "path";
+  5 |
+> 6 | PDFDocument.registerFontkit(fontkit);
+    |             ^
+  7 |
+  8 | export interface TableRow {
+  9 |   label: string; {
+  page: '/api/payments/7163/receipt'
+}
+⨯ TypeError: {imported module ./nodemodules/pdf-lib/es/api/PDFDocument.js}.PDFDocument.registerFontkit is not a function
+    at module evaluation (src\lib\pdf.ts:6:13)
+    at module evaluation (src\app\api\payments\[id]\receipt\route.ts:5:1)
+    at Object.<anonymous> (D:\Hust\Nhập môn công nghệ phần mềm\Project\IT3180\webapp\.next\dev\server\app\api\payments\[id]\receipt\route.js:19:3)
+  4 | import * as path from "path";
+  5 |
+> 6 | PDFDocument.registerFontkit(fontkit);
+    |             ^
+  7 |
+  8 | export interface TableRow {
+  9 |   label: string; {
+  page: '/api/payments/7163/receipt'
+}
+⨯ ReferenceError: fs is not defined
+    at getFontBytes (src\lib\pdf.ts:19:5)
+    at makeReceiptPdf (src\lib\pdf.ts:76:68)
+    at async GET (src\app\api\payments\[id]\receipt\route.ts:72:21)
+  17 |   if (!_fontRegular) {
+  18 |     const root = process.cwd();
+> 19 |     _fontRegular = fs.readFileSync(path.join(root, "public", "NotoSans.ttf"));
+     |     ^
+  20 |     _fontBold = _fontRegular;
+  21 |   }
+  22 |   return   { regular: _fontRegular!, bold: _fontBold! };
+[browser] ⨯ unhandledRejection: Error: Invalid role code
+    at apiPost (file://D:/Hust/Nhập môn công nghệ phần mềm/Project/IT3180/webapp/.next/dev/static/chunks/src_03b8vxz._.js:1747:15)
+[browser] ⨯ unhandledRejection: Error: Vehicle is already inside. Must exit first.
+    at apiPost (file://D:/Hust/Nhập môn công nghệ phần mềm/Project/IT3180/webapp/.next/dev/static/chunks/src_03b8vxz._.js:1747:15)
+    at async createVehicleLog (file://D:/Hust/Nhập môn công nghệ phần mềm/Project/IT3180/webapp/.next/dev/static/chunks/src_03b8vxz._.js?id=%255Bproject%255D%252Fsrc%252Fapp%252Fpage.tsx+%255Bapp-client%255D+%2528ecmascript%2529:1789:9)

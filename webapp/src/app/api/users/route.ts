@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     email: string;
     phone: string;
     fullName: string;
-    role: "ADMIN" | "ACCOUNTANT" | "TEAM_LEADER";
+    role: string;
     password: string;
     avatarUrl?: string;
     address?: string;
@@ -73,6 +73,9 @@ export async function POST(req: NextRequest) {
   const existing = await db.user.findFirst({ where: { OR: [{ username: body.username }, { email: body.email }] } });
   if (existing) return apiError("VALIDATION_ERROR", "Username or email already exists", 409);
 
+  const baseRoles = ["ADMIN", "ACCOUNTANT", "TEAM_LEADER", "GUARD"] as const;
+  const userRole = baseRoles.includes(body.role as typeof baseRoles[number]) ? body.role : "GUARD";
+
   const user = await db.user.create({
     data: {
       username: body.username,
@@ -81,7 +84,7 @@ export async function POST(req: NextRequest) {
       fullName: body.fullName,
       avatarUrl: body.avatarUrl ?? "",
       address: body.address ?? "",
-      role: body.role,
+      role: userRole as "ADMIN" | "ACCOUNTANT" | "TEAM_LEADER" | "GUARD",
       passwordHash: hashPassword(body.password),
       status: "ACTIVE",
     },

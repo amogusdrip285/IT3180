@@ -14,6 +14,7 @@
     "db:reset": "prisma migrate reset --force --skip-generate"
   },
   "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
     "@prisma/client": "^6.19.3",
     "@types/pdfkit": "^0.17.5",
     "exceljs": "^4.4.0",
